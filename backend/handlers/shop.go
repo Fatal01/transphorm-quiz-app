@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -88,6 +89,7 @@ func UpdateProduct(c *gin.Context) {
 		Stock       int    `json:"stock"`
 		IsActive    *bool  `json:"is_active"`
 		SortOrder   int    `json:"sort_order"`
+		Image       string `json:"image"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -108,6 +110,9 @@ func UpdateProduct(c *gin.Context) {
 	updates["sort_order"] = req.SortOrder
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
+	}
+	if req.Image != "" {
+		updates["image"] = req.Image
 	}
 
 	config.DB.Model(&product).Updates(updates)
@@ -207,29 +212,38 @@ func RedeemProduct(c *gin.Context) {
 		ProductID uint   `json:"product_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误，缺少 qr_data 或 product_id"})
 		return
 	}
 
-	// 解析二维码数据
-	var userID uint
-	var employeeID, name, signature string
-	var timestamp int64
-	n, err := fmt.Sscanf(req.QRData, "%d|%s", &userID, &employeeID)
-	if n < 2 || err != nil {
-		// 手动解析管道分隔
-		parts := splitQRData(req.QRData)
-		if len(parts) != 5 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "二维码数据无效"})
-			return
-		}
-		uid, _ := strconv.ParseUint(parts[0], 10, 64)
-		userID = uint(uid)
-		employeeID = parts[1]
-		name = parts[2]
-		timestamp, _ = strconv.ParseInt(parts[3], 10, 64)
-		signature = parts[4]
+	// 清理二维码数据中可能存在的首尾空白字符
+	qrDataClean := strings.TrimSpace(req.QRData)
+
+	// 解析二维码数据（格式：userID|employeeID|name|timestamp|signature）
+	// 注意：name 可能包含中文，使用自定义分割函数，最多分割成5段
+	parts := splitQRDataN(qrDataClean, 5)
+	if len(parts) != 5 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   fmt.Sprintf("二维码格式无效（字段数：%d，期望：5）", len(parts)),
+			"qr_data": qrDataClean,
+		})
+		return
 	}
+
+	uid, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "二维码用户ID无效"})
+		return
+	}
+	userID := uint(uid)
+	employeeID := parts[1]
+	name := parts[2]
+	timestamp, err := strconv.ParseInt(parts[3], 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "二维码时间戳无效"})
+		return
+	}
+	signature := parts[4]
 
 	// 验证签名
 	payload := fmt.Sprintf("%d|%s|%s|%d", userID, employeeID, name, timestamp)
@@ -238,13 +252,13 @@ func RedeemProduct(c *gin.Context) {
 	expectedSig := hex.EncodeToString(mac.Sum(nil))
 
 	if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "二维码签名验证失败，请重新生成"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "二维码签名验证失败，请让用户重新生成二维码"})
 		return
 	}
 
 	// 检查是否过期（5分钟）
 	if time.Now().Unix()-timestamp > 300 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "二维码已过期，请让用户重新生成"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "二维码已过期（有效期5分钟），请让用户重新生成"})
 		return
 	}
 
@@ -408,18 +422,23 @@ func GetAllRedemptions(c *gin.Context) {
 	})
 }
 
-// splitQRData 分割二维码数据
-func splitQRData(data string) []string {
-	var parts []string
-	current := ""
-	for _, ch := range data {
-		if ch == '|' {
-			parts = append(parts, current)
-			current = ""
-		} else {
-			current += string(ch)
-		}
+// splitQRDataN 将二维码数据按 | 分割，最多分割成 n 段
+// 这样可以正确处理 name 字段中包含 | 字符的极端情况（虽然不太可能）
+// 格式：userID|employeeID|name|timestamp|signature（共5段）
+func splitQRDataN(data string, n int) []string {
+	if n <= 0 {
+		return []string{data}
 	}
-	parts = append(parts, current)
+	parts := make([]string, 0, n)
+	remaining := data
+	for i := 0; i < n-1; i++ {
+		idx := strings.Index(remaining, "|")
+		if idx < 0 {
+			break
+		}
+		parts = append(parts, remaining[:idx])
+		remaining = remaining[idx+1:]
+	}
+	parts = append(parts, remaining)
 	return parts
 }

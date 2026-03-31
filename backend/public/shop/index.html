@@ -458,8 +458,8 @@
     <button class="camera-close" onclick="stopScan()">×</button>
   </div>
 
-  <!-- jsQR 库 -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <!-- jsQR 库（本地化，避免CDN依赖） -->
+  <script src="/shop/jsQR.min.js"></script>
 
   <script>
     const API_BASE = '/api';
