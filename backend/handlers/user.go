@@ -193,9 +193,23 @@ func ImportUsers(c *gin.Context) {
 		}
 
 		var user models.User
-		result := config.DB.Where("employee_id = ?", employeeID).First(&user)
+		// 先查找（包含软删除记录）
+		result := config.DB.Unscoped().Where("employee_id = ?", employeeID).First(&user)
 		if result.Error != nil {
-			// 新建用户
+			// 不存在，直接新建
+			newUser := models.User{
+				EmployeeID: employeeID,
+				Name:       name,
+			}
+			if err := config.DB.Create(&newUser).Error; err != nil {
+				failCount++
+				errors = append(errors, "创建失败: "+employeeID)
+			} else {
+				successCount++
+			}
+		} else if user.DeletedAt.Valid {
+			// 已软删除的记录：先硬删除，再重新创建
+			config.DB.Unscoped().Delete(&user)
 			newUser := models.User{
 				EmployeeID: employeeID,
 				Name:       name,
@@ -207,8 +221,8 @@ func ImportUsers(c *gin.Context) {
 				successCount++
 			}
 		} else {
-			// 更新姓名
-			config.DB.Model(&user).Update("name", name)
+			// 正常存在：更新姓名，同时恢复（以防万一）
+			config.DB.Model(&user).Updates(map[string]interface{}{"name": name})
 			successCount++
 		}
 	}
