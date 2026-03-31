@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>卓胜微20周年答题闯关活动</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+    .bg {
+      position: fixed; inset: 0;
+      background: url('/api/static/bg_tech.png') center center / cover no-repeat;
+      z-index: 0;
+    }
+    .bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(0, 10, 40, 0.6);
+    }
+    .page {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center;
+      padding: 0 16px 40px;
+    }
+
+    /* 顶部标题区 */
+    .header {
+      width: 100%; max-width: 480px;
+      text-align: center;
+      padding: 50px 0 30px;
+    }
+    .header-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, rgba(13,211,255,0.2), rgba(26,111,212,0.2));
+      border: 1px solid rgba(13,211,255,0.4);
+      border-radius: 20px;
+      padding: 5px 16px;
+      font-size: 12px; color: #0dd3ff;
+      letter-spacing: 1px; margin-bottom: 16px;
+    }
+    .header-title {
+      font-size: 26px; font-weight: 800;
+      color: #ffffff;
+      text-shadow: 0 0 30px rgba(13,211,255,0.5);
+      letter-spacing: 2px; line-height: 1.3;
+    }
+    .header-title span {
+      background: linear-gradient(90deg, #0dd3ff, #ffffff, #ffd700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header-sub {
+      font-size: 13px; color: rgba(255,255,255,0.5);
+      margin-top: 8px; letter-spacing: 1px;
+    }
+
+    /* 分数卡片 */
+    .score-card {
+      width: 100%; max-width: 480px;
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(13,211,255,0.08);
+    }
+    .score-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .score-label { font-size: 14px; color: rgba(255,255,255,0.6); }
+    .score-user { font-size: 13px; color: rgba(255,255,255,0.5); }
+    .score-main { display: flex; align-items: baseline; gap: 6px; }
+    .score-number {
+      font-size: 56px; font-weight: 800;
+      background: linear-gradient(135deg, #0dd3ff, #ffffff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+    .score-max { font-size: 18px; color: rgba(255,255,255,0.4); }
+    .score-progress {
+      margin-top: 16px;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px; overflow: hidden;
+    }
+    .score-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #1a6fd4, #0dd3ff);
+      border-radius: 3px;
+      transition: width 1s ease;
+    }
+    .score-detail {
+      margin-top: 14px;
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .score-item {
+      text-align: center;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px; padding: 8px 4px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .score-item-label { font-size: 10px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+    .score-item-val { font-size: 16px; font-weight: 700; color: #0dd3ff; }
+    .score-item-val.locked { color: rgba(255,255,255,0.2); }
+
+    /* 积分卡片 */
+    .points-card {
+      width: 100%; max-width: 480px;
+      background: linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,165,0,0.08));
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,215,0,0.2);
+      border-radius: 20px;
+      padding: 20px 28px;
+      margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .points-left {}
+    .points-label { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
+    .points-value {
+      font-size: 36px; font-weight: 800;
+      background: linear-gradient(135deg, #ffd700, #ffaa00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+    .points-sub { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+    .points-right { display: flex; gap: 10px; }
+    .points-btn {
+      width: 52px; height: 52px;
+      border-radius: 14px; border: none;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s;
+      font-size: 20px;
+    }
+    .points-btn span { font-size: 9px; margin-top: 2px; font-weight: 500; }
+    .btn-qr {
+      background: linear-gradient(135deg, rgba(13,211,255,0.2), rgba(13,211,255,0.1));
+      border: 1px solid rgba(13,211,255,0.3);
+      color: #0dd3ff;
+    }
+    .btn-qr:hover { background: rgba(13,211,255,0.3); }
+    .btn-record {
+      background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.1));
+      border: 1px solid rgba(255,215,0,0.3);
+      color: #ffd700;
+    }
+    .btn-record:hover { background: rgba(255,215,0,0.3); }
+
+    /* 功能按钮区 */
+    .actions {
+      width: 100%; max-width: 480px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .btn-ai {
+      width: 100%; padding: 18px 24px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      border: none; border-radius: 16px;
+      color: #fff; font-size: 17px; font-weight: 600;
+      cursor: pointer; letter-spacing: 1px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      box-shadow: 0 8px 25px rgba(124,58,237,0.4);
+      transition: all 0.3s; text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-ai:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(124,58,237,0.5); }
+    .btn-ai:active { transform: translateY(0); }
+    .btn-ai .btn-icon { font-size: 22px; }
+    .btn-ai .btn-text { display: flex; flex-direction: column; align-items: flex-start; }
+    .btn-ai .btn-title { font-size: 17px; font-weight: 700; }
+    .btn-ai .btn-desc { font-size: 12px; opacity: 0.8; font-weight: 400; margin-top: 2px; }
+
+    .btn-quiz {
+      width: 100%; padding: 18px 24px;
+      background: linear-gradient(135deg, #1a6fd4, #0dd3ff);
+      border: none; border-radius: 16px;
+      color: #fff; font-size: 17px; font-weight: 600;
+      cursor: pointer; letter-spacing: 1px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      box-shadow: 0 8px 25px rgba(13,211,255,0.3);
+      transition: all 0.3s; text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-quiz:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(13,211,255,0.45); }
+    .btn-quiz:active { transform: translateY(0); }
+    .btn-quiz .btn-icon { font-size: 22px; }
+    .btn-quiz .btn-text { display: flex; flex-direction: column; align-items: flex-start; }
+    .btn-quiz .btn-title { font-size: 17px; font-weight: 700; }
+    .btn-quiz .btn-desc { font-size: 12px; opacity: 0.8; font-weight: 400; margin-top: 2px; }
+
+    /* 通用弹窗 */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none; align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-overlay.center { align-items: center; }
+    .modal {
+      width: 100%; max-width: 480px;
+      background: #0d1b3e;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px 24px 0 0;
+      padding: 24px 20px 40px;
+      animation: slideUp 0.3s ease;
+    }
+    .modal-center {
+      border-radius: 24px;
+      padding: 32px 24px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; color: #fff; }
+    .modal-close {
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,0.1);
+      border: none; border-radius: 50%;
+      color: rgba(255,255,255,0.7); font-size: 18px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .quiz-list { display: flex; flex-direction: column; gap: 12px; }
+    .quiz-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      cursor: pointer; transition: all 0.2s;
+      text-decoration: none;
+    }
+    .quiz-item.available { border-color: rgba(13,211,255,0.3); background: rgba(13,211,255,0.05); }
+    .quiz-item.available:hover { background: rgba(13,211,255,0.1); }
+    .quiz-item.locked { cursor: not-allowed; opacity: 0.5; }
+    .quiz-item-left { display: flex; align-items: center; gap: 12px; }
+    .quiz-num {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #1a6fd4, #0dd3ff);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: #fff;
+    }
+    .quiz-num.locked-num { background: rgba(255,255,255,0.1); }
+    .quiz-name { font-size: 15px; font-weight: 600; color: #fff; }
+    .quiz-time { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .quiz-status {
+      font-size: 12px; padding: 4px 10px;
+      border-radius: 20px; font-weight: 500;
+    }
+    .quiz-status.open { background: rgba(13,211,255,0.15); color: #0dd3ff; border: 1px solid rgba(13,211,255,0.3); }
+    .quiz-status.locked-status { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.1); }
+    .quiz-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    .quiz-btn {
+      font-size: 12px; padding: 5px 12px;
+      border-radius: 16px; font-weight: 500;
+      border: none; cursor: pointer; white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .quiz-btn-enter { background: rgba(13,211,255,0.15); color: #0dd3ff; border: 1px solid rgba(13,211,255,0.3); }
+    .quiz-btn-enter:hover { background: rgba(13,211,255,0.3); }
+    .quiz-btn-score { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    .quiz-btn-score:hover { background: rgba(251,191,36,0.25); }
+    .modal-hint {
+      font-size: 11px; color: rgba(255,255,255,0.4);
+      font-weight: 400; margin-left: 8px; line-height: 1.4;
+    }
+
+    /* 二维码弹窗 */
+    .qr-container {
+      text-align: center; padding: 20px 0;
+    }
+    .qr-canvas {
+      width: 220px; height: 220px;
+      margin: 0 auto 16px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .qr-canvas canvas { width: 200px !important; height: 200px !important; }
+    .qr-info { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 8px; }
+    .qr-name { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .qr-id { font-size: 14px; color: rgba(255,255,255,0.5); margin-bottom: 16px; }
+    .qr-timer { font-size: 12px; color: #ffd700; }
+    .qr-refresh {
+      margin-top: 16px; padding: 10px 24px;
+      background: linear-gradient(135deg, #1a6fd4, #0dd3ff);
+      border: none; border-radius: 10px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* 兑换记录弹窗 */
+    .record-item {
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+    .record-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .record-name { font-size: 15px; font-weight: 600; color: #fff; }
+    .record-points { font-size: 15px; font-weight: 700; color: #ff6b6b; }
+    .record-points.success { color: #ff6b6b; }
+    .record-points.failed { color: rgba(255,255,255,0.3); }
+    .record-bottom { display: flex; justify-content: space-between; }
+    .record-time { font-size: 12px; color: rgba(255,255,255,0.35); }
+    .record-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+    .record-status.success { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .record-status.failed { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .empty-tip { text-align: center; color: rgba(255,255,255,0.3); padding: 40px 0; font-size: 14px; }
+
+    /* 用户信息栏 */
+    .user-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 50;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 12px 16px;
+      background: linear-gradient(to bottom, rgba(0,10,40,0.8), transparent);
+    }
+    .user-info {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: rgba(255,255,255,0.7);
+    }
+    .user-avatar {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, #1a6fd4, #0dd3ff);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #fff; font-weight: 700;
+    }
+    .logout-btn {
+      background: none; border: none;
+      color: rgba(255,255,255,0.4); font-size: 12px;
+      cursor: pointer; margin-left: 8px;
+      padding: 4px 8px; border-radius: 4px;
+    }
+    .logout-btn:hover { color: rgba(255,255,255,0.7); }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .header { animation: fadeInUp 0.5s ease both; }
+    .score-card { animation: fadeInUp 0.5s ease 0.1s both; }
+    .points-card { animation: fadeInUp 0.5s ease 0.15s both; }
+    .actions { animation: fadeInUp 0.5s ease 0.2s both; }
+  </style>
+</head>
+<body>
+  <div class="bg" id="bgEl"></div>
+
+  <!-- 用户信息栏 -->
+  <div class="user-bar">
+    <div class="user-info">
+      <div class="user-avatar" id="userAvatar">U</div>
+      <span id="userName">加载中...</span>
+      <button class="logout-btn" onclick="logout()">退出</button>
+    </div>
+  </div>
+
+  <div class="page">
+    <!-- 标题区 -->
+    <div class="header">
+      <div class="header-badge">🎉 20周年庆典</div>
+      <div class="header-title"><span>卓胜微20周年</span><br>答题闯关活动</div>
+      <div class="header-sub">Maxscend 20th Anniversary Quiz Challenge</div>
+    </div>
+
+    <!-- 分数卡片 -->
+    <div class="score-card">
+      <div class="score-header">
+        <div class="score-label">您已获得</div>
+        <div class="score-user" id="scoreUser"></div>
+      </div>
+      <div class="score-main">
+        <div class="score-number" id="totalScore">0</div>
+        <div class="score-max">/ 100 分</div>
+      </div>
+      <div class="score-progress">
+        <div class="score-progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+      <div class="score-detail" id="scoreDetail">
+        <div class="score-item"><div class="score-item-label">关卡1</div><div class="score-item-val locked" id="s1">-</div></div>
+        <div class="score-item"><div class="score-item-label">关卡2</div><div class="score-item-val locked" id="s2">-</div></div>
+        <div class="score-item"><div class="score-item-label">关卡3</div><div class="score-item-val locked" id="s3">-</div></div>
+        <div class="score-item"><div class="score-item-label">关卡4</div><div class="score-item-val locked" id="s4">-</div></div>
+        <div class="score-item"><div class="score-item-label">关卡5</div><div class="score-item-val locked" id="s5">-</div></div>
+      </div>
+    </div>
+
+    <!-- 积分卡片 -->
+    <div class="points-card">
+      <div class="points-left">
+        <div class="points-label">可用积分</div>
+        <div class="points-value" id="availablePoints">0</div>
+        <div class="points-sub">答题得分: <span id="earnedPoints">0</span> | 已兑换: <span id="usedPoints">0</span></div>
+      </div>
+      <div class="points-right">
+        <button class="points-btn btn-qr" onclick="openQRModal()" title="兑换二维码">
+          <span>📱</span>
+          <span>二维码</span>
+        </button>
+        <button class="points-btn btn-record" onclick="openRecordModal()" title="兑换记录">
+          <span>📋</span>
+          <span>记录</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 功能按钮 -->
+    <div class="actions">
+      <a class="btn-ai" id="aiBtn" href="#" onclick="openAI(event)">
+        <span class="btn-icon">🤖</span>
+        <span class="btn-text">
+          <span class="btn-title">AI 问答助手</span>
+          <span class="btn-desc">智能答疑，助力闯关</span>
+        </span>
+        <span>›</span>
+      </a>
+
+      <button class="btn-quiz" onclick="openQuizModal()">
+        <span class="btn-icon">🏆</span>
+        <span class="btn-text">
+          <span class="btn-title">挑战答题闯关</span>
+          <span class="btn-desc">五关挑战，赢取满分荣耀</span>
+        </span>
+        <span>›</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 问卷选择弹窗 -->
+  <div class="modal-overlay" id="quizModal" onclick="closeModal('quizModal', event)">
+    <div class="modal">
+      <div class="modal-header">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div class="modal-title">🏆 选择关卡</div>
+          <div class="modal-hint">✨ 闯关完成后需要一段时间才会进行分数统计哦~</div>
+        </div>
+        <button class="modal-close" onclick="closeModal('quizModal')">×</button>
+      </div>
+      <div class="quiz-list" id="quizList"></div>
+    </div>
+  </div>
+
+  <!-- 二维码弹窗 -->
+  <div class="modal-overlay center" id="qrModal" onclick="closeModal('qrModal', event)">
+    <div class="modal modal-center" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">📱 兑换二维码</div>
+        <button class="modal-close" onclick="closeModal('qrModal')">×</button>
+      </div>
+      <div class="qr-container">
+        <div class="qr-info">请向主办方出示此二维码</div>
+        <div class="qr-name" id="qrName"></div>
+        <div class="qr-id" id="qrId"></div>
+        <div class="qr-canvas" id="qrCanvas"></div>
+        <div class="qr-timer" id="qrTimer">有效期：5:00</div>
+        <button class="qr-refresh" onclick="generateQR()">刷新二维码</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 兑换记录弹窗 -->
+  <div class="modal-overlay center" id="recordModal" onclick="closeModal('recordModal', event)">
+    <div class="modal modal-center" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">📋 兑换记录</div>
+        <button class="modal-close" onclick="closeModal('recordModal')">×</button>
+      </div>
+      <div id="recordList"></div>
+    </div>
+  </div>
+
+  <!-- QR Code 库 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+  <script>
+    const API_BASE = '/api';
+    let appConfig = {};
+    let quizStatus = {};
+    let userScores = {};
+    let qrTimerInterval = null;
+
+    const token = localStorage.getItem('quiz_token');
+    if (!token) { window.location.href = '/app/login.html'; }
+    const user = JSON.parse(localStorage.getItem('quiz_user') || '{}');
+
+    async function init() {
+      document.getElementById('userName').textContent = user.name || '用户';
+      document.getElementById('userAvatar').textContent = (user.name || 'U')[0];
+      document.getElementById('scoreUser').textContent = user.employee_id || '';
+
+      // 加载配置
+      try {
+        const cfgRes = await fetch(`${API_BASE}/config`);
+        const cfgData = await cfgRes.json();
+        appConfig = cfgData.config || {};
+        quizStatus = cfgData.quiz_status || {};
+        if (appConfig.background_image) {
+          document.getElementById('bgEl').style.backgroundImage = `url('${appConfig.background_image}')`;
+        }
+      } catch(e) {}
+
+      // 加载分数
+      try {
+        const profileRes = await fetch(`${API_BASE}/user/profile`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (profileRes.status === 401) { logout(); return; }
+        const profileData = await profileRes.json();
+        userScores = profileData.scores || {};
+        const total = profileData.total_score || 0;
+
+        animateNumber('totalScore', total);
+        setTimeout(() => {
+          document.getElementById('progressBar').style.width = Math.min(total, 100) + '%';
+        }, 100);
+
+        for (let i = 1; i <= 5; i++) {
+          const el = document.getElementById('s' + i);
+          if (userScores[i] !== undefined) {
+            el.textContent = userScores[i];
+            el.classList.remove('locked');
+          }
+        }
+      } catch(e) {}
+
+      // 加载积分信息
+      try {
+        const pointsRes = await fetch(`${API_BASE}/user/points`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (pointsRes.ok) {
+          const pointsData = await pointsRes.json();
+          document.getElementById('availablePoints').textContent = pointsData.available_points || 0;
+          document.getElementById('earnedPoints').textContent = pointsData.total_score || 0;
+          document.getElementById('usedPoints').textContent = pointsData.used_points || 0;
+        }
+      } catch(e) {}
+    }
+
+    function animateNumber(id, target) {
+      const el = document.getElementById(id);
+      let current = 0;
+      const step = Math.ceil(target / 30);
+      const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current;
+        if (current >= target) clearInterval(timer);
+      }, 30);
+    }
+
+    function openAI(e) {
+      e.preventDefault();
+      const url = appConfig.ai_assistant_url;
+      if (!url) { alert('AI问答助手链接暂未配置，请联系管理员'); return; }
+      window.open(url, '_blank');
+    }
+
+    // ===== 弹窗通用 =====
+    function closeModal(id, e) {
+      if (!e || e.target.id === id) {
+        document.getElementById(id).classList.remove('show');
+      }
+    }
+
+    // ===== 问卷弹窗 =====
+    function openQuizModal() {
+      document.getElementById('quizModal').classList.add('show');
+      renderQuizList();
+    }
+
+    function renderQuizList() {
+      const list = document.getElementById('quizList');
+      list.innerHTML = '';
+      for (let i = 1; i <= 5; i++) {
+        const isOpen = quizStatus[i];
+        const url = appConfig['quiz_' + i + '_url'];
+        const scoreUrl = appConfig['quiz_' + i + '_score_url'];
+        const openTime = appConfig['quiz_' + i + '_open_time'];
+        const score = userScores[i];
+
+        const item = document.createElement('div');
+        item.className = 'quiz-item ' + (isOpen ? 'available' : 'locked');
+        if (isOpen) item.style.cursor = 'default';
+
+        const timeText = openTime ? `开放时间：${openTime}` : (isOpen ? '已开放' : '暂未开放');
+
+        if (isOpen) {
+          item.innerHTML = `
+            <div class="quiz-item-left">
+              <div class="quiz-num">${i}</div>
+              <div class="quiz-info">
+                <div class="quiz-name">第 ${i} 关挑战</div>
+                <div class="quiz-time">${timeText}${score !== undefined ? ' · 已得 ' + score + ' 分' : ''}</div>
+              </div>
+            </div>
+            <div class="quiz-actions">
+              ${url ? `<button class="quiz-btn quiz-btn-enter" data-url="${url}">进入闯关 ›</button>` : ''}
+              ${scoreUrl ? `<button class="quiz-btn quiz-btn-score" data-score-url="${scoreUrl}">📊 查询分数</button>` : ''}
+            </div>
+          `;
+          if (url) {
+            item.querySelector('.quiz-btn-enter').addEventListener('click', (e) => {
+              e.stopPropagation();
+              const q1 = encodeURIComponent(user.name || '');
+              const q2 = encodeURIComponent(user.employee_id || '');
+              const separator = url.includes('?') ? '&' : '?';
+              window.open(`${url}${separator}q1=${q1}&q2=${q2}`, '_blank');
+            });
+          }
+          if (scoreUrl) {
+            item.querySelector('.quiz-btn-score').addEventListener('click', (e) => {
+              e.stopPropagation();
+              const q1 = encodeURIComponent(user.name || '');
+              const q2 = encodeURIComponent(user.employee_id || '');
+              const separator = scoreUrl.includes('?') ? '&' : '?';
+              window.open(`${scoreUrl}${separator}q1=${q1}&q2=${q2}`, '_blank');
+            });
+          }
+        } else {
+          item.innerHTML = `
+            <div class="quiz-item-left">
+              <div class="quiz-num locked-num">${i}</div>
+              <div class="quiz-info">
+                <div class="quiz-name">第 ${i} 关挑战</div>
+                <div class="quiz-time">${timeText}</div>
+              </div>
+            </div>
+            <div class="quiz-status locked-status">未开放</div>
+          `;
+        }
+        list.appendChild(item);
+      }
+    }
+
+    // ===== 二维码 =====
+    function openQRModal() {
+      document.getElementById('qrModal').classList.add('show');
+      document.getElementById('qrName').textContent = user.name || '';
+      document.getElementById('qrId').textContent = '工号：' + (user.employee_id || '');
+      generateQR();
+    }
+
+    async function generateQR() {
+      try {
+        const res = await fetch(`${API_BASE}/user/qrcode`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) { alert('生成二维码失败'); return; }
+        const data = await res.json();
+
+        const canvas = document.getElementById('qrCanvas');
+        canvas.innerHTML = '';
+        const qrCanvas = document.createElement('canvas');
+        canvas.appendChild(qrCanvas);
+
+        QRCode.toCanvas(qrCanvas, data.qr_data, {
+          width: 200, margin: 0,
+          color: { dark: '#0d1b3e', light: '#ffffff' }
+        });
+
+        // 启动倒计时
+        if (qrTimerInterval) clearInterval(qrTimerInterval);
+        let remaining = data.expires_in || 300;
+        updateTimer(remaining);
+        qrTimerInterval = setInterval(() => {
+          remaining--;
+          updateTimer(remaining);
+          if (remaining <= 0) {
+            clearInterval(qrTimerInterval);
+            document.getElementById('qrTimer').textContent = '二维码已过期，请刷新';
+            document.getElementById('qrTimer').style.color = '#ef4444';
+          }
+        }, 1000);
+      } catch(e) {
+        alert('生成二维码失败，请重试');
+      }
+    }
+
+    function updateTimer(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = seconds % 60;
+      document.getElementById('qrTimer').textContent = `有效期：${min}:${sec.toString().padStart(2, '0')}`;
+      document.getElementById('qrTimer').style.color = seconds < 60 ? '#ef4444' : '#ffd700';
+    }
+
+    // ===== 兑换记录 =====
+    async function openRecordModal() {
+      document.getElementById('recordModal').classList.add('show');
+      const list = document.getElementById('recordList');
+      list.innerHTML = '<div class="empty-tip">加载中...</div>';
+
+      try {
+        const res = await fetch(`${API_BASE}/user/redemptions`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) { list.innerHTML = '<div class="empty-tip">加载失败</div>'; return; }
+        const data = await res.json();
+        const records = data.records || [];
+
+        if (records.length === 0) {
+          list.innerHTML = '<div class="empty-tip">暂无兑换记录</div>';
+          return;
+        }
+
+        list.innerHTML = records.map(r => `
+          <div class="record-item">
+            <div class="record-top">
+              <div class="record-name">${r.product_name}</div>
+              <div class="record-points ${r.status}">${r.status === 'success' ? '-' : ''}${r.points} 积分</div>
+            </div>
+            <div class="record-bottom">
+              <div class="record-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
+              <div class="record-status ${r.status}">${r.status === 'success' ? '兑换成功' : '兑换失败'}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch(e) {
+        list.innerHTML = '<div class="empty-tip">加载失败</div>';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('quiz_token');
+      localStorage.removeItem('quiz_user');
+      window.location.href = '/app/login.html';
+    }
+
+    init();
+  </script>
+</body>
+</html>

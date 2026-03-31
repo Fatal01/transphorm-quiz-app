@@ -1,0 +1,23 @@
+# 编译产物
+backend/quiz-server
+backend/quiz-server.exe
+
+# 数据库文件
+backend/quiz.db
+backend/*.db
+
+# Go缓存
+backend/go/
+vendor/
+
+# 系统文件
+.DS_Store
+*.swp
+*.swo
+
+# 日志
+*.log
+
+# 环境变量
+.env
+.env.local
