@@ -164,10 +164,14 @@
     }
     loadBackground();
 
+    // 读取 redirect 参数（登录后跳回来源页面）
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirect') || '';
+
     // 如果已登录则跳转
     const token = localStorage.getItem('quiz_token');
     if (token) {
-      window.location.href = '/app/index.html';
+      window.location.href = redirectTo || '/app/index.html';
     }
 
     document.getElementById('employeeId').addEventListener('keydown', e => {
@@ -202,7 +206,10 @@
         if (res.ok) {
           localStorage.setItem('quiz_token', data.token);
           localStorage.setItem('quiz_user', JSON.stringify(data.user));
-          if (data.is_admin) {
+          // 优先跳转到 redirect 指定地址，否则按角色跳转
+          if (redirectTo) {
+            window.location.href = redirectTo;
+          } else if (data.is_admin) {
             window.location.href = '/admin/index.html';
           } else {
             window.location.href = '/app/index.html';

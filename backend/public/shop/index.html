@@ -418,7 +418,7 @@
     const user = JSON.parse(localStorage.getItem('quiz_user') || '{}');
 
     if (!token || !user.is_admin) {
-      window.location.href = '/app/login.html';
+      window.location.href = '/app/login.html?redirect=' + encodeURIComponent('/shop/');
     }
     document.getElementById('navUser').textContent = user.name || '';
 
@@ -742,7 +742,7 @@
     function logout() {
       localStorage.removeItem('quiz_token');
       localStorage.removeItem('quiz_user');
-      window.location.href = '/app/login.html';
+      window.location.href = '/app/login.html?redirect=' + encodeURIComponent('/shop/');
     }
 
     // 初始化
