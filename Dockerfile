@@ -33,11 +33,8 @@ COPY --from=builder /app/quiz-server .
 # 复制前端静态文件
 COPY backend/public ./public
 
-# 复制静态资源（背景图等）
-COPY backend/static ./static
-
-# 创建数据目录
-RUN mkdir -p /data
+# 创建静态资源目录和数据目录（static 由运行时挂载 /data 提供）
+RUN mkdir -p /data /app/static
 
 # 暴露端口
 EXPOSE 8080
