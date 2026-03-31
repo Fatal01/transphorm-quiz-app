@@ -582,7 +582,23 @@
     function closeModal(id, e) {
       if (!e || e.target.id === id) {
         document.getElementById(id).classList.remove('show');
+        // 关闭二维码弹窗时刷新可用积分（兑换后积分可能已变化）
+        if (id === 'qrModal') refreshPoints();
       }
+    }
+
+    async function refreshPoints() {
+      try {
+        const res = await fetch(`${API_BASE}/user/points`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('availablePoints').textContent = data.available_points || 0;
+          document.getElementById('earnedPoints').textContent = data.total_score || 0;
+          document.getElementById('usedPoints').textContent = data.used_points || 0;
+        }
+      } catch(e) {}
     }
 
     // ===== 问卷弹窗 =====

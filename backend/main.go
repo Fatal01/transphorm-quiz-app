@@ -92,9 +92,10 @@ func main() {
 			admin.DELETE("/products/:id", handlers.DeleteProduct)
 			admin.POST("/products/upload", handlers.UploadProductImage)
 
-			// 兑换管理
-			admin.POST("/redeem", handlers.RedeemProduct)          // 扫码兑换
-			admin.GET("/redemptions", handlers.GetAllRedemptions)   // 兑换记录
+				// 兑换管理
+				admin.POST("/redeem", handlers.RedeemProduct)                   // 扫码兑换
+				admin.POST("/redemptions/:id/refund", handlers.RefundRedemption) // 退回兑换
+				admin.GET("/redemptions", handlers.GetAllRedemptions)            // 兑换记录
 		}
 	}
 
