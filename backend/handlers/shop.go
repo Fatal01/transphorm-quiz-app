@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	qrcode "github.com/skip2/go-qrcode"
 	"quiz-app/config"
 	"quiz-app/models"
 )
@@ -166,7 +168,7 @@ func UploadProductImage(c *gin.Context) {
 
 var qrSecret = []byte("quiz-shop-qr-secret-2026")
 
-// GenerateQRCode 生成用户兑换二维码数据（用户端调用）
+// GenerateQRCode 生成用户兑换二维码（后端生成base64图片，不依赖前端JS库）
 func GenerateQRCode(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	employeeID := c.GetString("employee_id")
@@ -181,11 +183,20 @@ func GenerateQRCode(c *gin.Context) {
 
 	qrData := fmt.Sprintf("%d|%s|%s|%d|%s", userID, employeeID, name, timestamp, signature)
 
+	// 后端生成二维码PNG图片
+	png, err := qrcode.Encode(qrData, qrcode.Medium, 256)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "二维码生成失败"})
+		return
+	}
+	qrImage := "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+
 	c.JSON(http.StatusOK, gin.H{
 		"qr_data":     qrData,
+		"qr_image":    qrImage,
 		"employee_id": employeeID,
 		"name":        name,
-		"expires_in":  300, // 5分钟有效
+		"expires_in":  300,
 	})
 }
 

@@ -493,8 +493,7 @@
     </div>
   </div>
 
-  <!-- QR Code 库 -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- 二维码由后端生成base64图片，无需前端JS库 -->
 
   <script>
     const API_BASE = '/api';
@@ -674,13 +673,17 @@
 
         const canvas = document.getElementById('qrCanvas');
         canvas.innerHTML = '';
-        const qrCanvas = document.createElement('canvas');
-        canvas.appendChild(qrCanvas);
 
-        QRCode.toCanvas(qrCanvas, data.qr_data, {
-          width: 200, margin: 0,
-          color: { dark: '#0d1b3e', light: '#ffffff' }
-        });
+        // 使用后端生成的 base64 二维码图片
+        if (data.qr_image) {
+          const img = document.createElement('img');
+          img.src = data.qr_image;
+          img.style.cssText = 'width:200px;height:200px;border-radius:8px;';
+          canvas.appendChild(img);
+        } else {
+          canvas.innerHTML = '<div style="padding:20px;color:#ef4444;">二维码生成失败，请刷新</div>';
+          return;
+        }
 
         // 启动倒计时
         if (qrTimerInterval) clearInterval(qrTimerInterval);
