@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/csv"
 	"io"
 	"net/http"
@@ -122,22 +123,22 @@ func GetAllUsers(c *gin.Context) {
 		models.User
 		TotalScore int `json:"total_score"`
 	}
-	var result []UserWithScore
+	var resultList []UserWithScore
 	for _, u := range users {
 		var sum struct{ Total int }
 		config.DB.Model(&models.Score{}).Select("COALESCE(SUM(score), 0) as total").Where("user_id = ?", u.ID).Scan(&sum)
-		result = append(result, UserWithScore{User: u, TotalScore: sum.Total})
+		resultList = append(resultList, UserWithScore{User: u, TotalScore: sum.Total})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"users":     result,
+		"users":     resultList,
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
 	})
 }
 
-// ImportUsers 批量导入用户（CSV）
+// ImportUsers 批量导入用户（CSV），自动支持 GBK/UTF-8 编码
 func ImportUsers(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -145,14 +146,14 @@ func ImportUsers(c *gin.Context) {
 		return
 	}
 
-	f, err := file.Open()
+	// 自动检测编码并转换为 UTF-8
+	utf8Data, err := readCSVFileAsUTF8(file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件读取失败"})
 		return
 	}
-	defer f.Close()
 
-	reader := csv.NewReader(f)
+	reader := csv.NewReader(bytes.NewReader(utf8Data))
 	reader.TrimLeadingSpace = true
 
 	var successCount, failCount int
@@ -261,6 +262,9 @@ func ExportUsers(c *gin.Context) {
 
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", "attachment; filename=users_scores.csv")
+
+	// 写入 UTF-8 BOM，确保 Excel 打开不乱码
+	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	w := csv.NewWriter(c.Writer)
 	w.Write([]string{"工号", "姓名", "问卷1", "问卷2", "问卷3", "问卷4", "问卷5", "总分"})

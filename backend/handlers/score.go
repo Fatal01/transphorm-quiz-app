@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/csv"
 	"io"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 	"quiz-app/models"
 )
 
-// ImportScores 批量导入分数（CSV）
+// ImportScores 批量导入分数（CSV），自动支持 GBK/UTF-8 编码
 func ImportScores(c *gin.Context) {
 	quizIndexStr := c.Param("quiz_index")
 	quizIndex, err := strconv.Atoi(quizIndexStr)
@@ -27,14 +28,14 @@ func ImportScores(c *gin.Context) {
 		return
 	}
 
-	f, err := file.Open()
+	// 自动检测编码并转换为 UTF-8
+	utf8Data, err := readCSVFileAsUTF8(file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件读取失败"})
 		return
 	}
-	defer f.Close()
 
-	reader := csv.NewReader(f)
+	reader := csv.NewReader(bytes.NewReader(utf8Data))
 	reader.TrimLeadingSpace = true
 
 	var successCount, failCount int
