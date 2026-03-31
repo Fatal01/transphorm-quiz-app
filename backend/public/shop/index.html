@@ -699,7 +699,7 @@
           <div class="record-item" id="record-${r.id}">
             <div class="record-top">
               <div class="record-user">${r.user_name}（${r.employee_id}）</div>
-              <div class="record-points ${r.status}">${r.status === 'success' ? '-' : r.status === 'refunded' ? '+' : ''}${r.points} 积分</div>
+              <div class="record-points ${r.status}">${r.status === 'success' ? '-' + r.points + ' 积分' : r.status === 'refunded' ? '已退回' : r.points + ' 积分'}</div>
             </div>
             <div class="record-mid">商品：${r.product_name}</div>
             <div class="record-bottom">
