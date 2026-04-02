@@ -52,7 +52,8 @@ func main() {
 		// 公开接口
 		api.POST("/login", handlers.Login)
 		api.GET("/config", handlers.GetConfig)
-		api.GET("/products", handlers.GetProducts) // 公开商品列表
+		api.GET("/products", handlers.GetProducts)           // 公开商品列表
+		api.GET("/activities", handlers.GetActiveActivities) // 公开活动列表（供 shop 扫码页使用）
 
 		// 需要登录的接口
 		auth := api.Group("/user")
@@ -60,8 +61,9 @@ func main() {
 		{
 			auth.GET("/profile", handlers.GetProfile)
 			auth.GET("/points", handlers.GetUserPoints)           // 获取积分信息
+			auth.PUT("/office", handlers.UpdateOffice)            // 更新办公地点
 			auth.GET("/qrcode", handlers.GenerateQRCode)          // 生成兑换二维码
-			auth.GET("/redemptions", handlers.GetUserRedemptions)  // 兑换记录
+			auth.GET("/redemptions", handlers.GetUserRedemptions)  // 兑换/积分记录
 		}
 
 		// 管理员接口
@@ -75,7 +77,7 @@ func main() {
 			admin.PUT("/users/:id", handlers.UpdateUser)
 			admin.GET("/users/export", handlers.ExportUsers)
 
-			// 分数管理
+			// 分数/通过状态管理
 			admin.GET("/scores", handlers.GetScores)
 			admin.POST("/scores/import/:quiz_index", handlers.ImportScores)
 			admin.PUT("/scores", handlers.UpdateScore)
@@ -92,10 +94,18 @@ func main() {
 			admin.DELETE("/products/:id", handlers.DeleteProduct)
 			admin.POST("/products/upload", handlers.UploadProductImage)
 
-				// 兑换管理
-				admin.POST("/redeem", handlers.RedeemProduct)                   // 扫码兑换
-				admin.POST("/redemptions/:id/refund", handlers.RefundRedemption) // 退回兑换
-				admin.GET("/redemptions", handlers.GetAllRedemptions)            // 兑换记录
+			// 活动管理
+			admin.GET("/activities", handlers.GetAllActivities)
+			admin.POST("/activities", handlers.CreateActivity)
+			admin.PUT("/activities/:id", handlers.UpdateActivity)
+			admin.DELETE("/activities/:id", handlers.DeleteActivity)
+			admin.POST("/activities/scan", handlers.ScanActivity)                // 扫码增加积分
+			admin.POST("/activities/:id/refund", handlers.RefundActivity)        // 退回活动积分
+
+			// 兑换管理
+			admin.POST("/redeem", handlers.RedeemProduct)                        // 扫码兑换商品
+			admin.POST("/redemptions/:id/refund", handlers.RefundRedemption)     // 退回商品兑换
+			admin.GET("/redemptions", handlers.GetAllRedemptions)                // 全部记录
 		}
 	}
 

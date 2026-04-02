@@ -60,7 +60,7 @@
       margin-top: 8px; letter-spacing: 1px;
     }
 
-    /* 分数卡片 */
+    /* 闯关进度卡片 */
     .score-card {
       width: 100%; max-width: 480px;
       background: rgba(255,255,255,0.07);
@@ -77,8 +77,10 @@
     }
     .score-label { font-size: 14px; color: rgba(255,255,255,0.6); }
     .score-user { font-size: 13px; color: rgba(255,255,255,0.5); }
-    .score-main { display: flex; align-items: baseline; gap: 6px; }
-    .score-number {
+
+    /* 进度百分比大字 */
+    .progress-main { display: flex; align-items: baseline; gap: 6px; }
+    .progress-number {
       font-size: 56px; font-weight: 800;
       background: linear-gradient(135deg, #0dd3ff, #ffffff);
       -webkit-background-clip: text;
@@ -86,19 +88,21 @@
       background-clip: text;
       line-height: 1;
     }
-    .score-max { font-size: 18px; color: rgba(255,255,255,0.4); }
+    .progress-unit { font-size: 18px; color: rgba(255,255,255,0.4); }
     .score-progress {
       margin-top: 16px;
-      height: 6px;
+      height: 8px;
       background: rgba(255,255,255,0.1);
-      border-radius: 3px; overflow: hidden;
+      border-radius: 4px; overflow: hidden;
     }
     .score-progress-bar {
       height: 100%;
       background: linear-gradient(90deg, #1a6fd4, #0dd3ff);
-      border-radius: 3px;
+      border-radius: 4px;
       transition: width 1s ease;
     }
+
+    /* 五关卡片 */
     .score-detail {
       margin-top: 14px;
       display: grid; grid-template-columns: repeat(5, 1fr);
@@ -110,9 +114,13 @@
       border-radius: 8px; padding: 8px 4px;
       border: 1px solid rgba(255,255,255,0.08);
     }
-    .score-item-label { font-size: 10px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
-    .score-item-val { font-size: 16px; font-weight: 700; color: #0dd3ff; }
-    .score-item-val.locked { color: rgba(255,255,255,0.2); }
+    .score-item.passed {
+      background: rgba(34,197,94,0.1);
+      border-color: rgba(34,197,94,0.3);
+    }
+    .score-item-label { font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 4px; font-weight: 600; }
+    .score-item-val { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.2); }
+    .score-item-val.passed-tag { color: #22c55e; font-size: 11px; }
 
     /* 积分卡片 */
     .points-card {
@@ -123,7 +131,10 @@
       border-radius: 20px;
       padding: 20px 28px;
       margin-bottom: 20px;
+    }
+    .points-top {
       display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
     }
     .points-left {}
     .points-label { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
@@ -135,7 +146,6 @@
       background-clip: text;
       line-height: 1;
     }
-    .points-sub { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 4px; }
     .points-right { display: flex; gap: 10px; }
     .points-btn {
       width: 52px; height: 52px;
@@ -159,28 +169,79 @@
     }
     .btn-record:hover { background: rgba(255,215,0,0.3); }
 
+    /* 积分明细行 */
+    .points-detail {
+      font-size: 12px; color: rgba(255,255,255,0.4);
+      display: flex; gap: 12px; flex-wrap: wrap;
+    }
+    .points-detail span { color: rgba(255,255,255,0.65); font-weight: 600; }
+
+    /* 办公地点下拉 */
+    .office-row {
+      margin-top: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .office-label { font-size: 12px; color: rgba(255,255,255,0.4); white-space: nowrap; }
+    .office-select {
+      flex: 1;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.7); font-size: 12px;
+      outline: none; cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+    .office-select option { background: #1a2a4a; color: #fff; }
+    .office-select:focus { border-color: rgba(13,211,255,0.5); }
+    .office-saved { font-size: 11px; color: #22c55e; opacity: 0; transition: opacity 0.3s; }
+    .office-saved.show { opacity: 1; }
+
     /* 功能按钮区 */
     .actions {
       width: 100%; max-width: 480px;
       display: flex; flex-direction: column; gap: 14px;
     }
+    /* AI 助手（禁用状态） */
     .btn-ai {
       width: 100%; padding: 18px 24px;
-      background: linear-gradient(135deg, #7c3aed, #a855f7);
-      border: none; border-radius: 16px;
-      color: #fff; font-size: 17px; font-weight: 600;
-      cursor: pointer; letter-spacing: 1px;
+      background: rgba(124,58,237,0.25);
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 16px;
+      color: rgba(255,255,255,0.4); font-size: 17px; font-weight: 600;
+      cursor: not-allowed; letter-spacing: 1px;
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      box-shadow: 0 8px 25px rgba(124,58,237,0.4);
       transition: all 0.3s; text-decoration: none;
       -webkit-tap-highlight-color: transparent;
+      pointer-events: none;
     }
-    .btn-ai:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(124,58,237,0.5); }
-    .btn-ai:active { transform: translateY(0); }
-    .btn-ai .btn-icon { font-size: 22px; }
+    .btn-ai .btn-icon { font-size: 22px; opacity: 0.4; }
     .btn-ai .btn-text { display: flex; flex-direction: column; align-items: flex-start; }
     .btn-ai .btn-title { font-size: 17px; font-weight: 700; }
-    .btn-ai .btn-desc { font-size: 12px; opacity: 0.8; font-weight: 400; margin-top: 2px; }
+    .btn-ai .btn-desc { font-size: 12px; opacity: 0.7; font-weight: 400; margin-top: 2px; }
+    .btn-coming { font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; }
+
+    /* 闯关规则按钮 */
+    .btn-rules {
+      width: 100%; padding: 18px 24px;
+      background: linear-gradient(135deg, rgba(255,165,0,0.2), rgba(255,215,0,0.15));
+      border: 1px solid rgba(255,215,0,0.35);
+      border-radius: 16px;
+      color: #ffd700; font-size: 17px; font-weight: 600;
+      cursor: pointer; letter-spacing: 1px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: all 0.3s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-rules:hover { background: linear-gradient(135deg, rgba(255,165,0,0.35), rgba(255,215,0,0.25)); transform: translateY(-1px); }
+    .btn-rules:active { transform: translateY(0); }
+    .btn-rules .btn-icon { font-size: 22px; }
+    .btn-rules .btn-text { display: flex; flex-direction: column; align-items: flex-start; }
+    .btn-rules .btn-title { font-size: 17px; font-weight: 700; }
+    .btn-rules .btn-desc { font-size: 12px; opacity: 0.8; font-weight: 400; margin-top: 2px; }
 
     .btn-quiz {
       width: 100%; padding: 18px 24px;
@@ -221,7 +282,7 @@
     .modal-center {
       border-radius: 24px;
       padding: 32px 24px;
-      max-height: 80vh;
+      max-height: 85vh;
       overflow-y: auto;
     }
     @keyframes slideUp {
@@ -239,7 +300,10 @@
       border: none; border-radius: 50%;
       color: rgba(255,255,255,0.7); font-size: 18px;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
+
+    /* 问卷列表 */
     .quiz-list { display: flex; flex-direction: column; gap: 12px; }
     .quiz-item {
       display: flex; align-items: center; justify-content: space-between;
@@ -252,6 +316,7 @@
     }
     .quiz-item.available { border-color: rgba(13,211,255,0.3); background: rgba(13,211,255,0.05); }
     .quiz-item.available:hover { background: rgba(13,211,255,0.1); }
+    .quiz-item.passed-item { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.05); }
     .quiz-item.locked { cursor: not-allowed; opacity: 0.5; }
     .quiz-item-left { display: flex; align-items: center; gap: 12px; }
     .quiz-num {
@@ -260,16 +325,19 @@
       border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
       font-size: 16px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
     }
     .quiz-num.locked-num { background: rgba(255,255,255,0.1); }
+    .quiz-num.passed-num { background: linear-gradient(135deg, #16a34a, #22c55e); }
     .quiz-name { font-size: 15px; font-weight: 600; color: #fff; }
     .quiz-time { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
     .quiz-status {
       font-size: 12px; padding: 4px 10px;
-      border-radius: 20px; font-weight: 500;
+      border-radius: 20px; font-weight: 500; flex-shrink: 0;
     }
     .quiz-status.open { background: rgba(13,211,255,0.15); color: #0dd3ff; border: 1px solid rgba(13,211,255,0.3); }
     .quiz-status.locked-status { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.1); }
+    .quiz-status.passed-status { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
     .quiz-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
     .quiz-btn {
       font-size: 12px; padding: 5px 12px;
@@ -320,15 +388,42 @@
     }
     .record-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .record-name { font-size: 15px; font-weight: 600; color: #fff; }
-    .record-points { font-size: 15px; font-weight: 700; color: #ff6b6b; }
-    .record-points.success { color: #ff6b6b; }
-    .record-points.failed { color: rgba(255,255,255,0.3); }
+    .record-points-neg { font-size: 15px; font-weight: 700; color: #ff6b6b; }
+    .record-points-pos { font-size: 15px; font-weight: 700; color: #22c55e; }
+    .record-points-neutral { font-size: 13px; font-weight: 600; color: #f97316; padding: 2px 8px; background: rgba(249,115,22,0.1); border-radius: 8px; }
     .record-bottom { display: flex; justify-content: space-between; }
     .record-time { font-size: 12px; color: rgba(255,255,255,0.35); }
     .record-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
     .record-status.success { background: rgba(34,197,94,0.15); color: #22c55e; }
     .record-status.failed { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .record-status.refunded { background: rgba(249,115,22,0.15); color: #f97316; }
+    .record-status.quiz { background: rgba(13,211,255,0.15); color: #0dd3ff; }
+    .record-status.activity { background: rgba(168,85,247,0.15); color: #a855f7; }
     .empty-tip { text-align: center; color: rgba(255,255,255,0.3); padding: 40px 0; font-size: 14px; }
+
+    /* 规则弹窗内容 */
+    .rules-content {
+      font-size: 14px; color: rgba(255,255,255,0.75);
+      line-height: 1.8;
+    }
+    .rules-content h3 {
+      font-size: 15px; font-weight: 700; color: #ffd700;
+      margin: 16px 0 8px;
+    }
+    .rules-content p { margin-bottom: 8px; }
+    .rules-content ol, .rules-content ul {
+      padding-left: 18px; margin-bottom: 8px;
+    }
+    .rules-content li { margin-bottom: 4px; }
+    .rules-intro {
+      background: rgba(13,211,255,0.08);
+      border: 1px solid rgba(13,211,255,0.2);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      font-size: 14px; color: rgba(255,255,255,0.8);
+      line-height: 1.8;
+    }
 
     /* 用户信息栏 */
     .user-bar {
@@ -383,61 +478,98 @@
     <!-- 标题区 -->
     <div class="header">
       <div class="header-badge">🎉 20周年庆典</div>
-      <div class="header-title"><span>卓胜微20周年</span><br>答题闯关活动</div>
-      <div class="header-sub">Maxscend 20th Anniversary Quiz Challenge</div>
+      <div class="header-title"><span>卓胜微20周年</span><br>线上答题闯关</div>
+      <div class="header-sub">Maxscend 20th Anniversary</div>
     </div>
 
-    <!-- 分数卡片 -->
+    <!-- 闯关进度卡片 -->
     <div class="score-card">
       <div class="score-header">
-        <div class="score-label">您已获得</div>
+        <div class="score-label">闯关进度</div>
         <div class="score-user" id="scoreUser"></div>
       </div>
-      <div class="score-main">
-        <div class="score-number" id="totalScore">0</div>
-        <div class="score-max">/ 100 分</div>
+      <div class="progress-main">
+        <div class="progress-number" id="progressPercent">0</div>
+        <div class="progress-unit">%</div>
       </div>
       <div class="score-progress">
         <div class="score-progress-bar" id="progressBar" style="width:0%"></div>
       </div>
       <div class="score-detail" id="scoreDetail">
-        <div class="score-item"><div class="score-item-label">关卡1</div><div class="score-item-val locked" id="s1">-</div></div>
-        <div class="score-item"><div class="score-item-label">关卡2</div><div class="score-item-val locked" id="s2">-</div></div>
-        <div class="score-item"><div class="score-item-label">关卡3</div><div class="score-item-val locked" id="s3">-</div></div>
-        <div class="score-item"><div class="score-item-label">关卡4</div><div class="score-item-val locked" id="s4">-</div></div>
-        <div class="score-item"><div class="score-item-label">关卡5</div><div class="score-item-val locked" id="s5">-</div></div>
+        <div class="score-item" id="stage1"><div class="score-item-label">初创</div><div class="score-item-val" id="s1">-</div></div>
+        <div class="score-item" id="stage2"><div class="score-item-label">挑战</div><div class="score-item-val" id="s2">-</div></div>
+        <div class="score-item" id="stage3"><div class="score-item-label">突破</div><div class="score-item-val" id="s3">-</div></div>
+        <div class="score-item" id="stage4"><div class="score-item-label">上升</div><div class="score-item-val" id="s4">-</div></div>
+        <div class="score-item" id="stage5"><div class="score-item-label">转型</div><div class="score-item-val" id="s5">-</div></div>
       </div>
     </div>
 
     <!-- 积分卡片 -->
     <div class="points-card">
-      <div class="points-left">
-        <div class="points-label">可用积分</div>
-        <div class="points-value" id="availablePoints">0</div>
-        <div class="points-sub">答题得分: <span id="earnedPoints">0</span> | 已兑换: <span id="usedPoints">0</span></div>
+      <div class="points-top">
+        <div class="points-left">
+          <div class="points-label">可用积分</div>
+          <div class="points-value" id="availablePoints">0</div>
+        </div>
+        <div class="points-right">
+          <button class="points-btn btn-qr" onclick="openQRModal()" title="兑换二维码">
+            <span>📱</span>
+            <span>二维码</span>
+          </button>
+          <button class="points-btn btn-record" onclick="openRecordModal()" title="兑换记录">
+            <span>📋</span>
+            <span>记录</span>
+          </button>
+        </div>
       </div>
-      <div class="points-right">
-        <button class="points-btn btn-qr" onclick="openQRModal()" title="兑换二维码">
-          <span>📱</span>
-          <span>二维码</span>
-        </button>
-        <button class="points-btn btn-record" onclick="openRecordModal()" title="兑换记录">
-          <span>📋</span>
-          <span>记录</span>
-        </button>
+      <div class="points-detail">
+        答题得分: <span id="earnedPoints">0</span> &nbsp;|&nbsp;
+        活动积分: <span id="activityPoints">0</span> &nbsp;|&nbsp;
+        已兑换: <span id="usedPoints">0</span>
+      </div>
+      <!-- 办公地点修改 -->
+      <div class="office-row">
+        <span class="office-label">办公地点：</span>
+        <select class="office-select" id="officeSelect" onchange="saveOffice()">
+          <option value="">请选择</option>
+          <option value="无锡园区">无锡园区</option>
+          <option value="无锡胡埭">无锡胡埭</option>
+          <option value="北京">北京</option>
+          <option value="深圳">深圳</option>
+          <option value="南通">南通</option>
+          <option value="上海">上海</option>
+          <option value="苏州办">苏州办</option>
+          <option value="苏州日月新">苏州日月新</option>
+          <option value="苏州嘉盛">苏州嘉盛</option>
+          <option value="西安">西安</option>
+          <option value="成都">成都</option>
+          <option value="重庆">重庆</option>
+          <option value="海外">海外</option>
+        </select>
+        <span class="office-saved" id="officeSaved">已保存</span>
       </div>
     </div>
 
     <!-- 功能按钮 -->
     <div class="actions">
-      <a class="btn-ai" id="aiBtn" href="#" onclick="openAI(event)">
+      <!-- AI 助手（暂时禁用） -->
+      <div class="btn-ai">
         <span class="btn-icon">🤖</span>
         <span class="btn-text">
-          <span class="btn-title">AI 问答助手</span>
+          <span class="btn-title">AI 问答助手 <span class="btn-coming">即将开放</span></span>
           <span class="btn-desc">智能答疑，助力闯关</span>
         </span>
+      </div>
+
+      <!-- 闯关规则 -->
+      <button class="btn-rules" onclick="openRulesModal()">
+        <span class="btn-icon">📖</span>
+        <span class="btn-text">
+          <span class="btn-title">闯关规则（必看！）</span>
+          <span class="btn-desc">了解活动规则，赢取积分奖励</span>
+        </span>
         <span>›</span>
-      </a>
+      </button>
 
       <button class="btn-quiz" onclick="openQuizModal()">
         <span class="btn-icon">🏆</span>
@@ -486,21 +618,56 @@
   <div class="modal-overlay center" id="recordModal" onclick="closeModal('recordModal', event)">
     <div class="modal modal-center" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <div class="modal-title">📋 兑换记录</div>
+        <div class="modal-title">📋 积分记录</div>
         <button class="modal-close" onclick="closeModal('recordModal')">×</button>
       </div>
       <div id="recordList"></div>
     </div>
   </div>
 
-  <!-- 二维码由后端生成base64图片，无需前端JS库 -->
+  <!-- 闯关规则弹窗 -->
+  <div class="modal-overlay center" id="rulesModal" onclick="closeModal('rulesModal', event)">
+    <div class="modal modal-center" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">📖 闯关规则（必看！）</div>
+        <button class="modal-close" onclick="closeModal('rulesModal')">×</button>
+      </div>
+      <div class="rules-content">
+        <div class="rules-intro">
+          各位MXDers，小卓20岁啦！20年来，我们坚守初心，我们以电路为笔，将创新写入每一条技术脉络，你是否好奇公司一路走来发生哪些故事？想不想看看自己对公司的了解到底有多深？我们为大家准备了一场答题闯关大挑战！快来一起试试吧！
+        </div>
+        <h3>一、活动概述</h3>
+        <p>我们将公司发展历程分为五个阶段，分别为<strong style="color:#ffd700">初创（2006-2011）、挑战（2012-2013）、突破（2014-2018）、上升（2019-2021）、转型（2022-至今）</strong>，每一阶段设置20道相关题目，题型包含选择题、判断题和问答题。参与者需依次通关，最终赢取积分奖励。</p>
+        <h3>二、计分规则</h3>
+        <ol>
+          <li>每一关共20题，每题5分，总分100分。</li>
+          <li>每一关得分达到100分，即视为当前关卡已通关，未达到100分则视为未通关。</li>
+          <li>每一关可以多次作答，但每次作答的题目都是随机的，所以每次的答案都不同，请认真作答。</li>
+          <li>五关全部通关后，将获得20积分的答题奖励。</li>
+        </ol>
+        <h3>三、积分兑换规则</h3>
+        <ol>
+          <li>积分可用于兑换活动礼品，礼品种类和数量有限，先到先得。</li>
+          <li>积分不可转让，不可兑换现金。</li>
+          <li>兑换礼品时，需出示本人的兑换二维码，由工作人员扫码确认。</li>
+        </ol>
+        <h3>四、注意事项</h3>
+        <ol>
+          <li>请使用本人工号登录，禁止代答或作弊，一经发现取消资格。</li>
+          <li>活动最终解释权归公司行政部活动组。</li>
+        </ol>
+      </div>
+    </div>
+  </div>
 
   <script>
     const API_BASE = '/api';
     let appConfig = {};
     let quizStatus = {};
-    let userScores = {};
+    let passedQuizzes = [];
     let qrTimerInterval = null;
+
+    const QUIZ_NAMES = ['', '初创期（2006-2011）', '挑战期（2012-2013）', '突破期（2014-2018）', '上升期（2019-2021）', '转型期（2022-至今）'];
 
     const token = localStorage.getItem('quiz_token');
     if (!token) { window.location.href = '/app/login.html'; }
@@ -510,6 +677,12 @@
       document.getElementById('userName').textContent = user.name || '用户';
       document.getElementById('userAvatar').textContent = (user.name || 'U')[0];
       document.getElementById('scoreUser').textContent = user.employee_id || '';
+
+      // 设置办公地点下拉框初始值
+      if (user.office) {
+        const sel = document.getElementById('officeSelect');
+        sel.value = user.office;
+      }
 
       // 加载配置
       try {
@@ -522,69 +695,8 @@
         }
       } catch(e) {}
 
-      // 加载分数
-      try {
-        const profileRes = await fetch(`${API_BASE}/user/profile`, {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (profileRes.status === 401) { logout(); return; }
-        const profileData = await profileRes.json();
-        userScores = profileData.scores || {};
-        const total = profileData.total_score || 0;
-
-        animateNumber('totalScore', total);
-        setTimeout(() => {
-          document.getElementById('progressBar').style.width = Math.min(total, 100) + '%';
-        }, 100);
-
-        for (let i = 1; i <= 5; i++) {
-          const el = document.getElementById('s' + i);
-          if (userScores[i] !== undefined) {
-            el.textContent = userScores[i];
-            el.classList.remove('locked');
-          }
-        }
-      } catch(e) {}
-
-      // 加载积分信息
-      try {
-        const pointsRes = await fetch(`${API_BASE}/user/points`, {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (pointsRes.ok) {
-          const pointsData = await pointsRes.json();
-          document.getElementById('availablePoints').textContent = pointsData.available_points || 0;
-          document.getElementById('earnedPoints').textContent = pointsData.total_score || 0;
-          document.getElementById('usedPoints').textContent = pointsData.used_points || 0;
-        }
-      } catch(e) {}
-    }
-
-    function animateNumber(id, target) {
-      const el = document.getElementById(id);
-      let current = 0;
-      const step = Math.ceil(target / 30);
-      const timer = setInterval(() => {
-        current = Math.min(current + step, target);
-        el.textContent = current;
-        if (current >= target) clearInterval(timer);
-      }, 30);
-    }
-
-    function openAI(e) {
-      e.preventDefault();
-      const url = appConfig.ai_assistant_url;
-      if (!url) { alert('AI问答助手链接暂未配置，请联系管理员'); return; }
-      window.open(url, '_blank');
-    }
-
-    // ===== 弹窗通用 =====
-    function closeModal(id, e) {
-      if (!e || e.target.id === id) {
-        document.getElementById(id).classList.remove('show');
-        // 关闭二维码弹窗时刷新可用积分（兑换后积分可能已变化）
-        if (id === 'qrModal') refreshPoints();
-      }
+      // 加载积分和通关状态
+      await refreshPoints();
     }
 
     async function refreshPoints() {
@@ -592,13 +704,94 @@
         const res = await fetch(`${API_BASE}/user/points`, {
           headers: { 'Authorization': 'Bearer ' + token }
         });
-        if (res.ok) {
-          const data = await res.json();
-          document.getElementById('availablePoints').textContent = data.available_points || 0;
-          document.getElementById('earnedPoints').textContent = data.total_score || 0;
-          document.getElementById('usedPoints').textContent = data.used_points || 0;
+        if (res.status === 401) { logout(); return; }
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const quizScore = data.quiz_score || 0;
+        const activityPts = data.activity_points || 0;
+        const usedPts = data.used_points || 0;
+        const available = data.available_points || 0;
+        passedQuizzes = data.passed_quizzes || [];
+        const progress = data.progress || 0;
+
+        document.getElementById('availablePoints').textContent = available;
+        document.getElementById('earnedPoints').textContent = quizScore;
+        document.getElementById('activityPoints').textContent = activityPts;
+        document.getElementById('usedPoints').textContent = usedPts;
+
+        // 进度条
+        animateNumber('progressPercent', progress);
+        setTimeout(() => {
+          document.getElementById('progressBar').style.width = progress + '%';
+        }, 100);
+
+        // 关卡状态
+        for (let i = 1; i <= 5; i++) {
+          const stageEl = document.getElementById('stage' + i);
+          const valEl = document.getElementById('s' + i);
+          if (passedQuizzes.includes(i)) {
+            stageEl.classList.add('passed');
+            valEl.textContent = '已通过';
+            valEl.className = 'score-item-val passed-tag';
+          } else {
+            stageEl.classList.remove('passed');
+            valEl.textContent = '-';
+            valEl.className = 'score-item-val';
+          }
         }
       } catch(e) {}
+    }
+
+    function animateNumber(id, target) {
+      const el = document.getElementById(id);
+      let current = parseInt(el.textContent) || 0;
+      const diff = target - current;
+      if (diff === 0) return;
+      const step = Math.ceil(Math.abs(diff) / 30);
+      const timer = setInterval(() => {
+        if (diff > 0) {
+          current = Math.min(current + step, target);
+        } else {
+          current = Math.max(current - step, target);
+        }
+        el.textContent = current;
+        if (current === target) clearInterval(timer);
+      }, 30);
+    }
+
+    // ===== 办公地点保存 =====
+    async function saveOffice() {
+      const office = document.getElementById('officeSelect').value;
+      if (!office) return;
+      try {
+        const res = await fetch(`${API_BASE}/user/office`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ office })
+        });
+        if (res.ok) {
+          const savedEl = document.getElementById('officeSaved');
+          savedEl.classList.add('show');
+          setTimeout(() => savedEl.classList.remove('show'), 2000);
+          // 更新本地缓存
+          const u = JSON.parse(localStorage.getItem('quiz_user') || '{}');
+          u.office = office;
+          localStorage.setItem('quiz_user', JSON.stringify(u));
+        }
+      } catch(e) {}
+    }
+
+    // ===== 弹窗通用 =====
+    function closeModal(id, e) {
+      if (!e || e.target.id === id) {
+        document.getElementById(id).classList.remove('show');
+        if (id === 'qrModal') refreshPoints();
+      }
+    }
+
+    function openRulesModal() {
+      document.getElementById('rulesModal').classList.add('show');
     }
 
     // ===== 问卷弹窗 =====
@@ -615,29 +808,40 @@
         const url = appConfig['quiz_' + i + '_url'];
         const scoreUrl = appConfig['quiz_' + i + '_score_url'];
         const openTime = appConfig['quiz_' + i + '_open_time'];
-        const score = userScores[i];
+        const isPassed = passedQuizzes.includes(i);
+        const quizName = QUIZ_NAMES[i];
 
         const item = document.createElement('div');
-        item.className = 'quiz-item ' + (isOpen ? 'available' : 'locked');
+        let itemClass = 'quiz-item ';
+        if (isPassed) itemClass += 'passed-item';
+        else if (isOpen) itemClass += 'available';
+        else itemClass += 'locked';
+        item.className = itemClass;
         if (isOpen) item.style.cursor = 'default';
 
         const timeText = openTime ? `开放时间：${openTime}` : (isOpen ? '已开放' : '暂未开放');
+        const numClass = isPassed ? 'quiz-num passed-num' : (isOpen ? 'quiz-num' : 'quiz-num locked-num');
 
-        if (isOpen) {
+        if (isOpen || isPassed) {
+          const statusHtml = isPassed
+            ? `<div class="quiz-status passed-status">✓ 已通过</div>`
+            : `<div class="quiz-status open">进行中</div>`;
+
           item.innerHTML = `
             <div class="quiz-item-left">
-              <div class="quiz-num">${i}</div>
+              <div class="${numClass}">${i}</div>
               <div class="quiz-info">
-                <div class="quiz-name">第 ${i} 关挑战</div>
-                <div class="quiz-time">${timeText}${score !== undefined ? ' · 已得 ' + score + ' 分' : ''}</div>
+                <div class="quiz-name">${quizName}</div>
+                <div class="quiz-time">${timeText}</div>
               </div>
             </div>
             <div class="quiz-actions">
-              ${url ? `<button class="quiz-btn quiz-btn-enter" data-url="${url}">进入闯关 ›</button>` : ''}
+              ${statusHtml}
+              ${url && !isPassed ? `<button class="quiz-btn quiz-btn-enter" data-url="${url}">进入闯关 ›</button>` : ''}
               ${scoreUrl ? `<button class="quiz-btn quiz-btn-score" data-score-url="${scoreUrl}">📊 查询分数</button>` : ''}
             </div>
           `;
-          if (url) {
+          if (url && !isPassed) {
             item.querySelector('.quiz-btn-enter').addEventListener('click', (e) => {
               e.stopPropagation();
               const q1 = encodeURIComponent(user.name || '');
@@ -658,9 +862,9 @@
         } else {
           item.innerHTML = `
             <div class="quiz-item-left">
-              <div class="quiz-num locked-num">${i}</div>
+              <div class="${numClass}">${i}</div>
               <div class="quiz-info">
-                <div class="quiz-name">第 ${i} 关挑战</div>
+                <div class="quiz-name">${quizName}</div>
                 <div class="quiz-time">${timeText}</div>
               </div>
             </div>
@@ -690,7 +894,6 @@
         const canvas = document.getElementById('qrCanvas');
         canvas.innerHTML = '';
 
-        // 使用后端生成的 base64 二维码图片
         if (data.qr_image) {
           const img = document.createElement('img');
           img.src = data.qr_image;
@@ -701,7 +904,6 @@
           return;
         }
 
-        // 启动倒计时
         if (qrTimerInterval) clearInterval(qrTimerInterval);
         let remaining = data.expires_in || 300;
         updateTimer(remaining);
@@ -726,7 +928,7 @@
       document.getElementById('qrTimer').style.color = seconds < 60 ? '#ef4444' : '#ffd700';
     }
 
-    // ===== 兑换记录 =====
+    // ===== 积分/兑换记录 =====
     async function openRecordModal() {
       document.getElementById('recordModal').classList.add('show');
       const list = document.getElementById('recordList');
@@ -741,22 +943,41 @@
         const records = data.records || [];
 
         if (records.length === 0) {
-          list.innerHTML = '<div class="empty-tip">暂无兑换记录</div>';
+          list.innerHTML = '<div class="empty-tip">暂无记录</div>';
           return;
         }
 
-        list.innerHTML = records.map(r => `
-          <div class="record-item">
-            <div class="record-top">
-              <div class="record-name">${r.product_name}</div>
-              <div class="record-points ${r.status}">${r.status === 'success' ? '-' : ''}${r.points} 积分</div>
+        list.innerHTML = records.map(r => {
+          let pointsHtml = '';
+          let statusHtml = '';
+
+          if (r.status === 'refunded') {
+            pointsHtml = `<div class="record-points-neutral">已退回</div>`;
+            statusHtml = `<div class="record-status refunded">已退回</div>`;
+          } else if (r.type === 'activity' || r.type === 'quiz') {
+            // 活动积分或答题奖励：显示 +积分
+            pointsHtml = `<div class="record-points-pos">+${r.points} 积分</div>`;
+            const typeLabel = r.type === 'quiz' ? '答题奖励' : '活动积分';
+            statusHtml = `<div class="record-status ${r.type}">${typeLabel}</div>`;
+          } else {
+            // 商品兑换：显示 -积分
+            pointsHtml = `<div class="record-points-neg">-${r.points} 积分</div>`;
+            statusHtml = `<div class="record-status success">兑换成功</div>`;
+          }
+
+          return `
+            <div class="record-item">
+              <div class="record-top">
+                <div class="record-name">${r.product_name}</div>
+                ${pointsHtml}
+              </div>
+              <div class="record-bottom">
+                <div class="record-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
+                ${statusHtml}
+              </div>
             </div>
-            <div class="record-bottom">
-              <div class="record-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
-              <div class="record-status ${r.status}">${r.status === 'success' ? '兑换成功' : '兑换失败'}</div>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch(e) {
         list.innerHTML = '<div class="empty-tip">加载失败</div>';
       }

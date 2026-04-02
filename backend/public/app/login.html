@@ -29,7 +29,7 @@
       min-height: 100vh; padding: 20px;
     }
     .logo-area {
-      text-align: center; margin-bottom: 40px;
+      text-align: center; margin-bottom: 32px;
     }
     .logo-icon {
       width: 80px; height: 80px;
@@ -65,11 +65,18 @@
       color: #fff; text-align: center;
       margin-bottom: 28px;
     }
-    .form-group { margin-bottom: 20px; }
+    .form-group { margin-bottom: 18px; }
     .form-label {
-      display: block; font-size: 13px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px;
       color: rgba(255,255,255,0.7);
       margin-bottom: 8px; letter-spacing: 0.5px;
+    }
+    .form-hint {
+      font-size: 11px;
+      color: rgba(13, 211, 255, 0.7);
+      font-weight: normal;
+      letter-spacing: 0;
     }
     .form-input {
       width: 100%; padding: 13px 16px;
@@ -86,6 +93,31 @@
       background: rgba(13,211,255,0.08);
       box-shadow: 0 0 0 3px rgba(13,211,255,0.15);
     }
+    /* 下拉框样式 */
+    .form-select {
+      width: 100%; padding: 13px 16px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      color: #fff; font-size: 15px;
+      outline: none; transition: all 0.3s;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(255,255,255,0.5)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      cursor: pointer;
+    }
+    .form-select option {
+      background: #1a2a4a;
+      color: #fff;
+    }
+    .form-select:focus {
+      border-color: #0dd3ff;
+      background-color: rgba(13,211,255,0.08);
+      box-shadow: 0 0 0 3px rgba(13,211,255,0.15);
+    }
+    .form-select.placeholder-selected { color: rgba(255,255,255,0.35); }
     .btn-login {
       width: 100%; padding: 15px;
       background: linear-gradient(135deg, #1a6fd4 0%, #0dd3ff 100%);
@@ -126,18 +158,40 @@
         </svg>
       </div>
       <div class="title">卓胜微20周年</div>
-      <div class="title">答题闯关活动</div>
+      <div class="title">线上答题闯关</div>
       <div class="subtitle">Maxscend 20th Anniversary</div>
     </div>
     <div class="card">
       <div class="card-title">员工登录</div>
       <div class="form-group">
-        <label class="form-label">工号</label>
+        <label class="form-label">
+          <span>工号</span>
+          <span class="form-hint">填写示例：E00xxxx</span>
+        </label>
         <input class="form-input" id="employeeId" type="text" placeholder="请输入您的工号" autocomplete="off">
       </div>
       <div class="form-group">
         <label class="form-label">姓名</label>
         <input class="form-input" id="name" type="text" placeholder="请输入您的姓名" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">办公地点</label>
+        <select class="form-select placeholder-selected" id="office" onchange="this.classList.remove('placeholder-selected')">
+          <option value="" disabled selected>请选择您的办公地点</option>
+          <option value="无锡园区">无锡园区</option>
+          <option value="无锡胡埭">无锡胡埭</option>
+          <option value="北京">北京</option>
+          <option value="深圳">深圳</option>
+          <option value="南通">南通</option>
+          <option value="上海">上海</option>
+          <option value="苏州办">苏州办</option>
+          <option value="苏州日月新">苏州日月新</option>
+          <option value="苏州嘉盛">苏州嘉盛</option>
+          <option value="西安">西安</option>
+          <option value="成都">成都</option>
+          <option value="重庆">重庆</option>
+          <option value="海外">海外</option>
+        </select>
       </div>
       <button class="btn-login" id="loginBtn" onclick="doLogin()">登 录</button>
       <div class="error-msg" id="errorMsg"></div>
@@ -148,7 +202,7 @@
   <script>
     const API_BASE = '/api';
 
-    // 动态加载背景图（从后台配置读取，支持后台更换背景）
+    // 动态加载背景图
     async function loadBackground() {
       try {
         const res = await fetch(`${API_BASE}/config`);
@@ -158,13 +212,11 @@
         if (bgUrl) {
           document.getElementById('bgEl').style.backgroundImage = `url('${bgUrl}')`;
         }
-      } catch (e) {
-        // 加载失败保持默认背景，不影响页面使用
-      }
+      } catch (e) {}
     }
     loadBackground();
 
-    // 读取 redirect 参数（登录后跳回来源页面）
+    // 读取 redirect 参数
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect') || '';
 
@@ -178,12 +230,13 @@
       if (e.key === 'Enter') document.getElementById('name').focus();
     });
     document.getElementById('name').addEventListener('keydown', e => {
-      if (e.key === 'Enter') doLogin();
+      if (e.key === 'Enter') document.getElementById('office').focus();
     });
 
     async function doLogin() {
       const employeeId = document.getElementById('employeeId').value.trim();
       const name = document.getElementById('name').value.trim();
+      const office = document.getElementById('office').value;
       const errorMsg = document.getElementById('errorMsg');
       const btn = document.getElementById('loginBtn');
 
@@ -200,13 +253,12 @@
         const res = await fetch(`${API_BASE}/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ employee_id: employeeId, name: name })
+          body: JSON.stringify({ employee_id: employeeId, name: name, office: office })
         });
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('quiz_token', data.token);
           localStorage.setItem('quiz_user', JSON.stringify(data.user));
-          // 优先跳转到 redirect 指定地址，否则按角色跳转
           if (redirectTo) {
             window.location.href = redirectTo;
           } else if (data.is_admin) {

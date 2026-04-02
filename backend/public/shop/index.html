@@ -38,13 +38,15 @@
       background: rgba(10,15,30,0.97);
       display: flex; align-items: stretch;
       border-bottom: 1px solid rgba(255,255,255,0.08);
+      overflow-x: auto;
     }
+    .tabs::-webkit-scrollbar { display: none; }
     .tab {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 500;
+      flex: 1; min-width: 72px; display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500;
       color: rgba(255,255,255,0.4);
       cursor: pointer; border-bottom: 2px solid transparent;
-      transition: all 0.2s;
+      transition: all 0.2s; white-space: nowrap; padding: 0 4px;
     }
     .tab.active { color: #0dd3ff; border-bottom-color: #0dd3ff; }
 
@@ -120,6 +122,23 @@
       cursor: pointer; white-space: nowrap;
     }
 
+    /* ===== 活动扫码面板（与商品扫码同样布局，绿色主题）===== */
+    .activity-option {
+      padding: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 12px; cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .activity-option.selected { border-color: #22c55e; background: rgba(34,197,94,0.08); }
+    .activity-option:hover { background: rgba(255,255,255,0.06); }
+    .activity-option-name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .activity-option-points { font-size: 12px; color: #22c55e; font-weight: 700; }
+    .activity-option-desc { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+    .scan-btn-green {
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      box-shadow: 0 0 50px rgba(34,197,94,0.3);
+    }
+
     /* ===== 商品管理面板 ===== */
     .section-header {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
@@ -129,6 +148,9 @@
       padding: 8px 16px;
       background: linear-gradient(135deg, #1a6fd4, #0dd3ff);
       border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .add-btn-green {
+      background: linear-gradient(135deg, #16a34a, #22c55e);
     }
     .product-card {
       background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
@@ -145,9 +167,10 @@
       font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 6px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .product-meta { display: flex; gap: 12px; font-size: 12px; }
+    .product-meta { display: flex; gap: 12px; font-size: 12px; flex-wrap: wrap; }
     .product-meta-item { color: rgba(255,255,255,0.5); }
     .product-meta-item b { color: #ffd700; }
+    .product-meta-item b.green { color: #22c55e; }
     .product-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
     .product-actions button {
       padding: 6px 12px; border-radius: 8px; font-size: 12px; border: none; cursor: pointer; font-weight: 500;
@@ -161,6 +184,25 @@
     .badge-inactive { background: rgba(239,68,68,0.15); color: #ef4444; }
 
     /* ===== 兑换记录面板 ===== */
+    .search-bar {
+      display: flex; gap: 8px; margin-bottom: 14px;
+    }
+    .search-bar input {
+      flex: 1; padding: 10px 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; color: #fff; font-size: 13px;
+    }
+    .search-bar input:focus { outline: none; border-color: #0dd3ff; }
+    .search-bar button {
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #1a6fd4, #0dd3ff);
+      border: none; border-radius: 10px;
+      color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .search-bar .clear-btn {
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);
+    }
     .record-item {
       padding: 14px; background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; margin-bottom: 10px;
@@ -168,9 +210,11 @@
     .record-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .record-user { font-size: 14px; font-weight: 600; }
     .record-points { font-size: 14px; font-weight: 700; }
-    .record-points.success { color: #22c55e; }
-    .record-points.failed { color: #ef4444; }
+    .record-points.success { color: #ef4444; }
+    .record-points.failed { color: rgba(255,255,255,0.3); }
     .record-points.refunded { color: #f59e0b; }
+    .record-points.activity { color: #22c55e; }
+    .record-points.quiz { color: #0dd3ff; }
     .record-mid { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 6px; }
     .record-bottom { display: flex; justify-content: space-between; align-items: center; }
     .record-time { font-size: 12px; color: rgba(255,255,255,0.3); }
@@ -178,6 +222,8 @@
     .record-status.success { background: rgba(34,197,94,0.15); color: #22c55e; }
     .record-status.failed { background: rgba(239,68,68,0.15); color: #ef4444; }
     .record-status.refunded { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .record-status.activity { background: rgba(34,197,94,0.12); color: #22c55e; }
+    .record-status.quiz { background: rgba(13,211,255,0.12); color: #0dd3ff; }
     .btn-refund {
       padding: 4px 10px; border-radius: 6px; font-size: 11px; border: none; cursor: pointer;
       background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 500;
@@ -225,6 +271,7 @@
     }
     .btn-cancel { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
     .btn-save { background: linear-gradient(135deg, #1a6fd4, #0dd3ff); color: #fff; }
+    .btn-save-green { background: linear-gradient(135deg, #16a34a, #22c55e); color: #fff; }
 
     /* ===== 摄像头扫码 ===== */
     .camera-overlay {
@@ -238,6 +285,7 @@
       width: 240px; height: 240px;
       border: 2px solid rgba(13,211,255,0.6); border-radius: 20px;
     }
+    .camera-frame.green { border-color: rgba(34,197,94,0.6); }
     .camera-tip {
       position: absolute; bottom: 100px; left: 0; right: 0;
       text-align: center; color: rgba(255,255,255,0.7); font-size: 14px;
@@ -293,10 +341,12 @@
     <button class="nav-logout" onclick="logout()">退出</button>
   </div>
 
-  <!-- 标签页 -->
+  <!-- 标签页（5个）-->
   <div class="tabs">
     <div class="tab active" data-tab="scan" onclick="switchTab('scan')">扫码兑换</div>
     <div class="tab" data-tab="products" onclick="switchTab('products')">商品管理</div>
+    <div class="tab" data-tab="activity-scan" onclick="switchTab('activity-scan')">活动积分</div>
+    <div class="tab" data-tab="activities" onclick="switchTab('activities')">活动管理</div>
     <div class="tab" data-tab="records" onclick="switchTab('records')">兑换记录</div>
   </div>
 
@@ -309,7 +359,7 @@
         <div class="product-grid" id="productGrid"></div>
       </div>
       <div class="scan-section">
-        <button class="scan-btn" id="scanBtn" onclick="startScan()" disabled>
+        <button class="scan-btn" id="scanBtn" onclick="startScan('redeem')" disabled>
           📷<span>扫码兑换</span>
         </button>
         <div class="scan-tip" id="scanTip">请先选择商品</div>
@@ -332,10 +382,45 @@
       <div id="productList"></div>
     </div>
 
+    <!-- ===== 活动积分扫码面板 ===== -->
+    <div class="panel" id="panel-activity-scan">
+      <div class="product-select">
+        <div class="product-select-title">① 选择要增加积分的活动</div>
+        <div class="product-grid" id="activityGrid"></div>
+      </div>
+      <div class="scan-section">
+        <button class="scan-btn scan-btn-green" id="actScanBtn" onclick="startScan('activity')" disabled>
+          📷<span>扫码增分</span>
+        </button>
+        <div class="scan-tip" id="actScanTip">请先选择活动</div>
+      </div>
+      <div class="manual-input">
+        <div class="manual-title">或手动粘贴二维码内容</div>
+        <div class="manual-row">
+          <input type="text" id="manualActQR" placeholder="粘贴二维码内容">
+          <button onclick="manualActivityRedeem()" style="background:linear-gradient(135deg,#16a34a,#22c55e)">增加积分</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 活动管理面板 ===== -->
+    <div class="panel" id="panel-activities">
+      <div class="section-header">
+        <div class="section-title">活动列表</div>
+        <button class="add-btn add-btn-green" onclick="openActivityForm()">+ 添加活动</button>
+      </div>
+      <div id="activityList"></div>
+    </div>
+
     <!-- ===== 兑换记录面板 ===== -->
     <div class="panel" id="panel-records">
       <div class="section-header">
         <div class="section-title">兑换记录</div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchEmployeeId" placeholder="输入工号搜索（如 E00xxxx）">
+        <button onclick="searchRecords()">搜索</button>
+        <button class="clear-btn" onclick="clearSearch()">清除</button>
       </div>
       <div id="recordList"></div>
     </div>
@@ -391,10 +476,47 @@
     </div>
   </div>
 
+  <!-- 活动编辑弹窗 -->
+  <div class="form-overlay" id="activityFormOverlay">
+    <div class="form-modal">
+      <div class="form-title" id="actFormTitle">添加活动</div>
+      <input type="hidden" id="editActivityId">
+      <div class="form-group">
+        <label class="form-label">活动名称 *</label>
+        <input class="form-input" id="aName" placeholder="请输入活动名称">
+      </div>
+      <div class="form-group">
+        <label class="form-label">活动描述</label>
+        <textarea class="form-textarea" id="aDesc" placeholder="请输入活动描述"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">增加积分 *</label>
+          <input class="form-input" id="aPoints" type="number" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">状态</label>
+          <select class="form-select form-input" id="aActive">
+            <option value="true">启用</option>
+            <option value="false">停用</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">排序</label>
+        <input class="form-input" id="aSort" type="number" placeholder="0" value="0">
+      </div>
+      <div class="form-btns">
+        <button class="btn-cancel" onclick="closeActivityForm()">取消</button>
+        <button class="btn-save btn-save-green" onclick="saveActivity()">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 摄像头扫码 -->
   <div class="camera-overlay" id="cameraOverlay">
     <video class="camera-video" id="cameraVideo" autoplay playsinline></video>
-    <div class="camera-frame"></div>
+    <div class="camera-frame" id="cameraFrame"></div>
     <div class="camera-tip">将二维码放入框内自动识别</div>
     <button class="camera-close" onclick="stopScan()">×</button>
   </div>
@@ -423,9 +545,12 @@
     document.getElementById('navUser').textContent = user.name || '';
 
     let selectedProductId = null;
+    let selectedActivityId = null;
     let products = [];
+    let activities = [];
     let cameraStream = null;
     let scanAnimFrame = null;
+    let currentScanMode = 'redeem'; // 'redeem' | 'activity'
 
     // ===== 标签页切换 =====
     function switchTab(tab) {
@@ -435,10 +560,12 @@
       document.getElementById('panel-' + tab).classList.add('active');
       if (tab === 'scan') loadScanProducts();
       if (tab === 'products') loadProducts();
+      if (tab === 'activity-scan') loadActivityScan();
+      if (tab === 'activities') loadActivities();
       if (tab === 'records') loadRecords();
     }
 
-    // ===== 扫码兑换 =====
+    // ===== 扫码兑换（商品）=====
     async function loadScanProducts() {
       try {
         const res = await fetch(`${API_BASE}/products`);
@@ -469,14 +596,52 @@
     function selectProduct(id) {
       selectedProductId = id;
       renderProductGrid();
-      const btn = document.getElementById('scanBtn');
-      btn.disabled = false;
+      document.getElementById('scanBtn').disabled = false;
       const p = products.find(x => x.id === id);
       document.getElementById('scanTip').textContent = `已选：${p.name}（${p.points} 积分）`;
     }
 
-    function startScan() {
-      if (!selectedProductId) { alert('请先选择商品'); return; }
+    // ===== 活动积分扫码 =====
+    async function loadActivityScan() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/activities`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        activities = (data.activities || []).filter(a => a.is_active);
+        renderActivityGrid();
+      } catch(e) {}
+    }
+
+    function renderActivityGrid() {
+      const grid = document.getElementById('activityGrid');
+      if (activities.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(255,255,255,0.3);padding:20px;font-size:13px">暂无启用的活动</div>';
+        return;
+      }
+      grid.innerHTML = activities.map(a => `
+        <div class="activity-option ${selectedActivityId === a.id ? 'selected' : ''}" onclick="selectActivity(${a.id})">
+          <div style="font-size:28px;margin-bottom:8px">🎯</div>
+          <div class="activity-option-name">${a.name}</div>
+          <div class="activity-option-points">+${a.points} 积分</div>
+          <div class="activity-option-desc">${a.description || ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectActivity(id) {
+      selectedActivityId = id;
+      renderActivityGrid();
+      document.getElementById('actScanBtn').disabled = false;
+      const a = activities.find(x => x.id === id);
+      document.getElementById('actScanTip').textContent = `已选：${a.name}（+${a.points} 积分）`;
+    }
+
+    // ===== 摄像头扫码通用 =====
+    function startScan(mode) {
+      currentScanMode = mode;
+      if (mode === 'redeem' && !selectedProductId) { alert('请先选择商品'); return; }
+      if (mode === 'activity' && !selectedActivityId) { alert('请先选择活动'); return; }
+      const frame = document.getElementById('cameraFrame');
+      frame.className = 'camera-frame' + (mode === 'activity' ? ' green' : '');
       document.getElementById('cameraOverlay').classList.add('show');
       navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -503,7 +668,15 @@
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const code = jsQR(imageData.data, imageData.width, imageData.height);
-          if (code) { stopScan(); doRedeem(code.data); return; }
+          if (code) {
+            stopScan();
+            if (currentScanMode === 'activity') {
+              doActivityRedeem(code.data);
+            } else {
+              doRedeem(code.data);
+            }
+            return;
+          }
         }
         scanAnimFrame = requestAnimationFrame(tick);
       }
@@ -523,8 +696,15 @@
       doRedeem(qrData);
     }
 
+    function manualActivityRedeem() {
+      const qrData = document.getElementById('manualActQR').value.trim();
+      if (!qrData) { alert('请输入二维码内容'); return; }
+      if (!selectedActivityId) { alert('请先选择活动'); return; }
+      doActivityRedeem(qrData);
+    }
+
+    // ===== 商品兑换 =====
     async function doRedeem(qrData) {
-      // 显示 loading
       showResultModal('loading', '⏳', '处理中…', '正在验证并兑换，请稍候');
       try {
         const res = await fetch(`${API_BASE}/admin/redeem`, {
@@ -533,7 +713,6 @@
           body: JSON.stringify({ qr_data: qrData, product_id: selectedProductId })
         });
         const data = await res.json();
-
         if (res.ok) {
           showResultModal(
             'success', '✅', '兑换成功！',
@@ -542,13 +721,39 @@
             `消耗积分：<b>${data.points_cost}</b><br>` +
             `剩余积分：<b>${data.remaining_points}</b>`
           );
-          loadScanProducts(); // 刷新库存
+          loadScanProducts();
         } else {
           let detail = data.error || '未知错误';
           if (data.required_points !== undefined) {
             detail += `<br>需要 <b>${data.required_points}</b> 积分，当前仅有 <b>${data.available_points}</b> 积分`;
           }
           showResultModal('error', '❌', '兑换失败', detail);
+        }
+      } catch(e) {
+        showResultModal('error', '❌', '网络错误', '请检查网络连接后重试');
+      }
+    }
+
+    // ===== 活动积分增加 =====
+    async function doActivityRedeem(qrData) {
+      showResultModal('loading', '⏳', '处理中…', '正在验证并增加积分，请稍候');
+      try {
+        const res = await fetch(`${API_BASE}/admin/activity-redeem`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ qr_data: qrData, activity_id: selectedActivityId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showResultModal(
+            'success', '🎯', '积分增加成功！',
+            `<b>${data.user_name}</b>（${data.employee_id}）<br>` +
+            `活动：<b>${data.activity_name}</b><br>` +
+            `增加积分：<b>+${data.points_added}</b><br>` +
+            `当前可用积分：<b>${data.new_available}</b>`
+          );
+        } else {
+          showResultModal('error', '❌', '增加积分失败', data.error || '未知错误');
         }
       } catch(e) {
         showResultModal('error', '❌', '网络错误', '请检查网络连接后重试');
@@ -572,6 +777,7 @@
     function closeResultModal() {
       document.getElementById('resultOverlay').classList.remove('show');
       document.getElementById('manualQR').value = '';
+      document.getElementById('manualActQR').value = '';
     }
 
     // ===== 商品管理 =====
@@ -685,41 +891,167 @@
       } catch(e) {}
     }
 
-    // ===== 兑换记录 =====
-    async function loadRecords() {
+    // ===== 活动管理 =====
+    async function loadActivities() {
       try {
-        const res = await fetch(`${API_BASE}/admin/redemptions?page_size=50`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const res = await fetch(`${API_BASE}/admin/activities`, { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
-        const records = data.records || [];
-        const el = document.getElementById('recordList');
-        if (records.length === 0) { el.innerHTML = '<div class="empty-tip">暂无兑换记录</div>'; return; }
-
-        const statusLabel = { success: '兑换成功', failed: '兑换失败', refunded: '已退回' };
-        el.innerHTML = records.map(r => `
-          <div class="record-item" id="record-${r.id}">
-            <div class="record-top">
-              <div class="record-user">${r.user_name}（${r.employee_id}）</div>
-              <div class="record-points ${r.status}">${r.status === 'success' ? '-' + r.points + ' 积分' : r.status === 'refunded' ? '已退回' : r.points + ' 积分'}</div>
-            </div>
-            <div class="record-mid">商品：${r.product_name}</div>
-            <div class="record-bottom">
-              <div class="record-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="record-status ${r.status}">${statusLabel[r.status] || r.status}</span>
-                ${r.status === 'success'
-                  ? `<button class="btn-refund" onclick="refundRecord(${r.id}, '${r.user_name}', '${r.product_name}')">退回</button>`
-                  : ''}
+        const list = data.activities || [];
+        const el = document.getElementById('activityList');
+        if (list.length === 0) { el.innerHTML = '<div class="empty-tip">暂无活动，点击右上角添加</div>'; return; }
+        el.innerHTML = list.map(a => `
+          <div class="product-card">
+            <div class="product-img" style="display:flex;align-items:center;justify-content:center;font-size:30px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)">🎯</div>
+            <div class="product-info">
+              <div class="product-name">${a.name}
+                <span class="product-badge ${a.is_active ? 'badge-active' : 'badge-inactive'}">${a.is_active ? '启用' : '停用'}</span>
               </div>
+              <div class="product-desc">${a.description || '暂无描述'}</div>
+              <div class="product-meta">
+                <div class="product-meta-item">增加 <b class="green">+${a.points}</b> 积分</div>
+                <div class="product-meta-item">排序 ${a.sort_order}</div>
+              </div>
+            </div>
+            <div class="product-actions">
+              <button class="btn-edit" onclick="editActivity(${a.id})">编辑</button>
+              <button class="btn-del" onclick="deleteActivity(${a.id}, '${a.name}')">删除</button>
             </div>
           </div>
         `).join('');
       } catch(e) {
-        document.getElementById('recordList').innerHTML = '<div class="empty-tip">加载失败</div>';
+        document.getElementById('activityList').innerHTML = '<div class="empty-tip">加载失败</div>';
       }
     }
 
+    function openActivityForm(activity) {
+      document.getElementById('activityFormOverlay').classList.add('show');
+      document.getElementById('actFormTitle').textContent = activity ? '编辑活动' : '添加活动';
+      document.getElementById('editActivityId').value = activity ? activity.id : '';
+      document.getElementById('aName').value = activity ? activity.name : '';
+      document.getElementById('aDesc').value = activity ? activity.description : '';
+      document.getElementById('aPoints').value = activity ? activity.points : '';
+      document.getElementById('aSort').value = activity ? activity.sort_order : 0;
+      document.getElementById('aActive').value = activity ? String(activity.is_active) : 'true';
+    }
+
+    function closeActivityForm() { document.getElementById('activityFormOverlay').classList.remove('show'); }
+
+    async function editActivity(id) {
+      try {
+        const res = await fetch(`${API_BASE}/admin/activities`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        const activity = (data.activities || []).find(a => a.id === id);
+        if (activity) openActivityForm(activity);
+      } catch(e) {}
+    }
+
+    async function saveActivity() {
+      const id = document.getElementById('editActivityId').value;
+      const body = {
+        name: document.getElementById('aName').value.trim(),
+        description: document.getElementById('aDesc').value.trim(),
+        points: parseInt(document.getElementById('aPoints').value) || 0,
+        sort_order: parseInt(document.getElementById('aSort').value) || 0,
+        is_active: document.getElementById('aActive').value === 'true'
+      };
+      if (!body.name) { alert('请输入活动名称'); return; }
+      if (body.points <= 0) { alert('请输入正确的积分数'); return; }
+      try {
+        const url = id ? `${API_BASE}/admin/activities/${id}` : `${API_BASE}/admin/activities`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+          method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body)
+        });
+        if (res.ok) { closeActivityForm(); loadActivities(); }
+        else { const data = await res.json(); alert(data.error || '保存失败'); }
+      } catch(e) { alert('保存失败'); }
+    }
+
+    async function deleteActivity(id, name) {
+      if (!confirm(`确定删除活动「${name}」吗？`)) return;
+      try {
+        await fetch(`${API_BASE}/admin/activities/${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+        loadActivities();
+      } catch(e) {}
+    }
+
+    // ===== 兑换记录 =====
+    let currentSearchId = '';
+
+    async function loadRecords(employeeId) {
+      const el = document.getElementById('recordList');
+      el.innerHTML = '<div class="empty-tip">加载中...</div>';
+      try {
+        let url = `${API_BASE}/admin/redemptions?page_size=100`;
+        if (employeeId) url += `&employee_id=${encodeURIComponent(employeeId)}`;
+        const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        const records = data.records || [];
+        if (records.length === 0) { el.innerHTML = '<div class="empty-tip">暂无记录</div>'; return; }
+
+        const typeLabel = { success: '兑换成功', failed: '兑换失败', refunded: '已退回', activity: '活动积分', quiz: '答题奖励' };
+        el.innerHTML = records.map(r => {
+          let pointsClass = r.status;
+          let pointsText = '';
+          if (r.status === 'refunded') {
+            pointsText = '已退回';
+          } else if (r.type === 'activity') {
+            pointsClass = 'activity';
+            pointsText = `+${r.points} 积分`;
+          } else if (r.type === 'quiz') {
+            pointsClass = 'quiz';
+            pointsText = `+${r.points} 积分`;
+          } else if (r.status === 'success') {
+            pointsText = `-${r.points} 积分`;
+          } else {
+            pointsText = `${r.points} 积分`;
+          }
+
+          const statusClass = r.type === 'activity' ? 'activity' : r.type === 'quiz' ? 'quiz' : r.status;
+          const statusText = r.type === 'activity' ? '活动积分' : r.type === 'quiz' ? '答题奖励' : (typeLabel[r.status] || r.status);
+
+          return `
+            <div class="record-item" id="record-${r.id}">
+              <div class="record-top">
+                <div class="record-user">${r.user_name}（${r.employee_id}）</div>
+                <div class="record-points ${pointsClass}">${pointsText}</div>
+              </div>
+              <div class="record-mid">${r.type === 'activity' || r.type === 'quiz' ? '活动/奖励' : '商品'}：${r.product_name}</div>
+              <div class="record-bottom">
+                <div class="record-time">${new Date(r.created_at).toLocaleString('zh-CN')}</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="record-status ${statusClass}">${statusText}</span>
+                  ${r.status === 'success' && r.type !== 'activity' && r.type !== 'quiz'
+                    ? `<button class="btn-refund" onclick="refundRecord(${r.id}, '${r.user_name}', '${r.product_name}')">退回</button>`
+                    : ''}
+                  ${(r.type === 'activity') && r.status === 'success'
+                    ? `<button class="btn-refund" onclick="refundRecord(${r.id}, '${r.user_name}', '${r.product_name}')">退回</button>`
+                    : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch(e) {
+        el.innerHTML = '<div class="empty-tip">加载失败</div>';
+      }
+    }
+
+    function searchRecords() {
+      const id = document.getElementById('searchEmployeeId').value.trim();
+      currentSearchId = id;
+      loadRecords(id || undefined);
+    }
+
+    function clearSearch() {
+      document.getElementById('searchEmployeeId').value = '';
+      currentSearchId = '';
+      loadRecords();
+    }
+
     async function refundRecord(id, userName, productName) {
-      if (!confirm(`确定退回「${userName}」兑换的「${productName}」吗？\n退回后积分将返还给用户，库存恢复。`)) return;
+      if (!confirm(`确定退回「${userName}」的「${productName}」吗？\n退回后积分将返还给用户。`)) return;
       try {
         const res = await fetch(`${API_BASE}/admin/redemptions/${id}/refund`, {
           method: 'POST', headers: { 'Authorization': 'Bearer ' + token }
@@ -732,7 +1064,7 @@
             `返还积分：<b>${data.points_refunded}</b><br>` +
             `用户当前可用积分：<b>${data.new_available}</b>`
           );
-          loadRecords();
+          loadRecords(currentSearchId || undefined);
         } else {
           alert(data.error || '退回失败');
         }

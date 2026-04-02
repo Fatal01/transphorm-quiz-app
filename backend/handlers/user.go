@@ -19,6 +19,7 @@ func Login(c *gin.Context) {
 	var req struct {
 		EmployeeID string `json:"employee_id" binding:"required"`
 		Name       string `json:"name" binding:"required"`
+		Office     string `json:"office"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入工号和姓名"})
@@ -27,11 +28,12 @@ func Login(c *gin.Context) {
 
 	req.EmployeeID = strings.TrimSpace(req.EmployeeID)
 	req.Name = strings.TrimSpace(req.Name)
+	req.Office = strings.TrimSpace(req.Office)
 
 	var user models.User
 	result := config.DB.Where("employee_id = ? AND name = ?", req.EmployeeID, req.Name).First(&user)
 	if result.Error != nil {
-		// 检查是否是管理员（必须工号和姓名都匹配）
+		// 检查是否是管理员
 		if req.EmployeeID == "admin" {
 			var adminUser models.User
 			config.DB.Where("employee_id = ? AND name = ? AND is_admin = ?", "admin", req.Name, true).First(&adminUser)
@@ -53,6 +55,12 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// 如果提交了办公地点，更新到数据库
+	if req.Office != "" {
+		config.DB.Model(&user).Update("office", req.Office)
+		user.Office = req.Office
+	}
+
 	token, err := middleware.GenerateToken(user.ID, user.EmployeeID, user.Name, user.IsAdmin)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成token失败"})
@@ -64,6 +72,30 @@ func Login(c *gin.Context) {
 		"user":     user,
 		"is_admin": user.IsAdmin,
 	})
+}
+
+// UpdateOffice 更新当前用户的办公地点
+func UpdateOffice(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	var req struct {
+		Office string `json:"office" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请提供办公地点"})
+		return
+	}
+
+	req.Office = strings.TrimSpace(req.Office)
+
+	var user models.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		return
+	}
+
+	config.DB.Model(&user).Update("office", req.Office)
+	c.JSON(http.StatusOK, gin.H{"message": "办公地点已更新", "office": req.Office})
 }
 
 // GetProfile 获取当前用户信息和分数
@@ -118,16 +150,15 @@ func GetAllUsers(c *gin.Context) {
 	query.Count(&total)
 	query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&users)
 
-	// 获取每个用户的总分
 	type UserWithScore struct {
 		models.User
-		TotalScore int `json:"total_score"`
+		PassedCount int `json:"passed_count"`
 	}
 	var resultList []UserWithScore
 	for _, u := range users {
-		var sum struct{ Total int }
-		config.DB.Model(&models.Score{}).Select("COALESCE(SUM(score), 0) as total").Where("user_id = ?", u.ID).Scan(&sum)
-		resultList = append(resultList, UserWithScore{User: u, TotalScore: sum.Total})
+		var passed int64
+		config.DB.Model(&models.Score{}).Where("user_id = ? AND score = 100", u.ID).Count(&passed)
+		resultList = append(resultList, UserWithScore{User: u, PassedCount: int(passed)})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -146,7 +177,6 @@ func ImportUsers(c *gin.Context) {
 		return
 	}
 
-	// 自动检测编码并转换为 UTF-8
 	utf8Data, err := readCSVFileAsUTF8(file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件读取失败"})
@@ -193,10 +223,8 @@ func ImportUsers(c *gin.Context) {
 		}
 
 		var user models.User
-		// 先查找（包含软删除记录）
 		result := config.DB.Unscoped().Where("employee_id = ?", employeeID).First(&user)
 		if result.Error != nil {
-			// 不存在，直接新建
 			newUser := models.User{
 				EmployeeID: employeeID,
 				Name:       name,
@@ -208,7 +236,6 @@ func ImportUsers(c *gin.Context) {
 				successCount++
 			}
 		} else if user.DeletedAt.Valid {
-			// 已软删除的记录：先硬删除，再重新创建
 			config.DB.Unscoped().Delete(&user)
 			newUser := models.User{
 				EmployeeID: employeeID,
@@ -221,7 +248,6 @@ func ImportUsers(c *gin.Context) {
 				successCount++
 			}
 		} else {
-			// 正常存在：更新姓名，同时恢复（以防万一）
 			config.DB.Model(&user).Updates(map[string]interface{}{"name": name})
 			successCount++
 		}
@@ -269,7 +295,7 @@ func UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功", "user": user})
 }
 
-// ExportUsers 导出用户列表和分数
+// ExportUsers 导出用户列表（含办公地点、通过状态、积分）
 func ExportUsers(c *gin.Context) {
 	var users []models.User
 	config.DB.Where("is_admin = ?", false).Find(&users)
@@ -281,31 +307,66 @@ func ExportUsers(c *gin.Context) {
 	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	w := csv.NewWriter(c.Writer)
-	w.Write([]string{"工号", "姓名", "问卷1", "问卷2", "问卷3", "问卷4", "问卷5", "总分"})
+	w.Write([]string{
+		"工号", "姓名", "办公地点",
+		"初创(1)", "挑战(2)", "突破(3)", "上升(4)", "转型(5)",
+		"答题积分", "活动积分", "已兑换", "可用积分",
+	})
 
 	for _, u := range users {
 		var scores []models.Score
 		config.DB.Where("user_id = ?", u.ID).Find(&scores)
 
-		scoreMap := map[int]int{}
+		passMap := map[int]string{}
 		for _, s := range scores {
-			scoreMap[s.QuizIndex] = s.Score
+			if s.Score == 100 {
+				passMap[s.QuizIndex] = "通过"
+			} else {
+				passMap[s.QuizIndex] = "未通过"
+			}
 		}
 
-		total := 0
-		for _, v := range scoreMap {
-			total += v
+		// 统计答题积分（5关全通过得20分）
+		passedCount := 0
+		for i := 1; i <= 5; i++ {
+			if passMap[i] == "通过" {
+				passedCount++
+			}
 		}
+		quizScore := 0
+		if passedCount == 5 {
+			quizScore = 20
+		}
+
+		// 活动积分
+		var activitySum struct{ Total int }
+		config.DB.Model(&models.Redemption{}).
+			Select("COALESCE(SUM(points), 0) as total").
+			Where("user_id = ? AND type = 'activity' AND status = 'success'", u.ID).
+			Scan(&activitySum)
+
+		// 已兑换
+		var usedSum struct{ Total int }
+		config.DB.Model(&models.Redemption{}).
+			Select("COALESCE(SUM(points), 0) as total").
+			Where("user_id = ? AND type = 'redeem' AND status = 'success'", u.ID).
+			Scan(&usedSum)
+
+		available := quizScore + activitySum.Total - usedSum.Total
 
 		row := []string{
 			u.EmployeeID,
 			u.Name,
-			strconv.Itoa(scoreMap[1]),
-			strconv.Itoa(scoreMap[2]),
-			strconv.Itoa(scoreMap[3]),
-			strconv.Itoa(scoreMap[4]),
-			strconv.Itoa(scoreMap[5]),
-			strconv.Itoa(total),
+			u.Office,
+			passMap[1],
+			passMap[2],
+			passMap[3],
+			passMap[4],
+			passMap[5],
+			strconv.Itoa(quizScore),
+			strconv.Itoa(activitySum.Total),
+			strconv.Itoa(usedSum.Total),
+			strconv.Itoa(available),
 		}
 		w.Write(row)
 	}
