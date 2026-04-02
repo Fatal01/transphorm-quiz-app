@@ -984,7 +984,7 @@
       el.innerHTML = '<div class="empty-tip">加载中...</div>';
       try {
         let url = `${API_BASE}/admin/redemptions?page_size=100`;
-        if (employeeId) url += `&employee_id=${encodeURIComponent(employeeId)}`;
+        if (employeeId) url += `&search=${encodeURIComponent(employeeId)}`;
         const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
         const records = data.records || [];
