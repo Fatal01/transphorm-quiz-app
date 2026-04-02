@@ -88,5 +88,4 @@ type Redemption struct {
 	Remark      string    `gorm:"size:500" json:"remark"`                           // 备注
 	OperatorID  uint      `gorm:"default:0" json:"operator_id"`                     // 操作人ID（管理员）
 	User        User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Product     Product   `gorm:"foreignKey:ProductID;constraint:OnUpdate:NO ACTION,OnDelete:NO ACTION" json:"product,omitempty"`
 }
