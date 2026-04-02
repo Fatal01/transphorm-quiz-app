@@ -738,7 +738,7 @@
     async function doActivityRedeem(qrData) {
       showResultModal('loading', '⏳', '处理中…', '正在验证并增加积分，请稍候');
       try {
-        const res = await fetch(`${API_BASE}/admin/activity-redeem`, {
+        const res = await fetch(`${API_BASE}/admin/activities/scan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ qr_data: qrData, activity_id: selectedActivityId })
