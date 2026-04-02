@@ -1,0 +1,34 @@
+version: "3.9"
+
+# 只启动 app，连接已有的 quiz_mysql 容器
+# 生产环境：APP_PORT=18084 MYSQL_DB=quiz_app  docker-compose -f docker-compose.app.yml -p prod up -d --build
+# 测试环境：APP_PORT=18082 MYSQL_DB=quiz_test docker-compose -f docker-compose.app.yml -p test up -d --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: quiz_mysql      # 固定指向共用的 MySQL 容器名
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-quizuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quizpass}
+      MYSQL_DB: ${MYSQL_DB:-quiz_app}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      TZ: Asia/Shanghai
+    volumes:
+      - ${STATIC_VOLUME:-static_data}:/app/static   # 不同实例可挂载不同 volume
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - quiz_net   # 加入共用网络，才能访问 quiz_mysql
+
+networks:
+  quiz_net:
+    external: true   # 引用已由 docker-compose.mysql.yml 创建的外部网络
+    name: quiz_net
+
+volumes:
+  static_data:

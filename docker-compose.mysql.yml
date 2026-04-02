@@ -1,0 +1,35 @@
+version: "3.9"
+
+# 只启动 MySQL，供所有 app 实例共用
+# 启动命令：docker-compose -f docker-compose.mysql.yml up -d
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: quiz_mysql   # 固定名字，方便 app 通过名字连接
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-quizapp2026}
+      MYSQL_DATABASE: ${MYSQL_DB:-quiz_app}
+      MYSQL_USER: ${MYSQL_USER:-quizuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quizpass}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - quiz_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1",
+             "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:-quizapp2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  db_data:
+
+networks:
+  quiz_net:
+    name: quiz_net   # 固定网络名，app 实例加入此网络即可访问 MySQL
