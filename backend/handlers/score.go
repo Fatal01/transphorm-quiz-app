@@ -37,7 +37,7 @@ func ImportScores(c *gin.Context) {
 	reader := csv.NewReader(bytes.NewReader(utf8Data))
 	reader.TrimLeadingSpace = true
 
-	var successCount, failCount int
+	var successCount, failCount, bonusGranted int
 	var errList []string
 	isFirst := true
 
@@ -93,25 +93,29 @@ func ImportScores(c *gin.Context) {
 		}
 		successCount++
 
-		// 检查是否5关全部通过，若是则写入答题奖励积分（幂等：只写一次）
-		checkAndGrantQuizBonus(user)
+		// 检查是否5关全部通过，若是则写入20分答题奖励（幂等）
+		if checkAndGrantQuizBonus(user) {
+			bonusGranted++
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success":    successCount,
-		"fail":       failCount,
-		"errors":     errList,
-		"quiz_index": quizIndex,
-		"message":    "通过名单导入完成",
+		"success":       successCount,
+		"fail":          failCount,
+		"errors":        errList,
+		"quiz_index":    quizIndex,
+		"bonus_granted": bonusGranted,
+		"message":       "通过名单导入完成",
 	})
 }
 
 // checkAndGrantQuizBonus 检查用户是否5关全通过，若是则写入20分答题奖励（幂等）
-func checkAndGrantQuizBonus(user models.User) {
+// 返回 true 表示本次新发放了奖励
+func checkAndGrantQuizBonus(user models.User) bool {
 	var passedCount int64
 	config.DB.Model(&models.Score{}).Where("user_id = ? AND score = 100", user.ID).Count(&passedCount)
 	if passedCount < 5 {
-		return
+		return false
 	}
 
 	// 幂等检查：是否已经发放过答题奖励
@@ -120,7 +124,7 @@ func checkAndGrantQuizBonus(user models.User) {
 		Where("user_id = ? AND type = 'quiz' AND status = 'success'", user.ID).
 		Count(&existing)
 	if existing > 0 {
-		return
+		return false
 	}
 
 	// 写入答题奖励积分记录
@@ -135,6 +139,23 @@ func checkAndGrantQuizBonus(user models.User) {
 		Type:        "quiz",
 		Remark:      "5关全部通过，自动发放20积分奖励",
 	})
+
+	// 同步更新 User 冗余积分字段
+	var actSum struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='activity' AND status='success'", user.ID).Scan(&actSum)
+	var usedSum struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='redeem' AND status='success'", user.ID).Scan(&usedSum)
+	newPoints := 20 + actSum.Total - usedSum.Total
+	if newPoints < 0 {
+		newPoints = 0
+	}
+	config.DB.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
+		"quiz_score": 20,
+		"points":     newPoints,
+	})
+	return true
 }
 
 // GetScores 管理员获取所有用户通过状态
