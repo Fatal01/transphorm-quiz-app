@@ -7,9 +7,10 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      width: 100%; height: 100%;
+      width: 100%; min-height: 100%;
       font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
     }
     .bg {
       position: fixed; inset: 0;
@@ -25,11 +26,12 @@
     .container {
       position: relative; z-index: 1;
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      min-height: 100vh; padding: 20px;
+      align-items: center; justify-content: flex-start;
+      min-height: 100vh; padding: 40px 20px;
     }
     .logo-area {
       text-align: center; margin-bottom: 32px;
+      margin-top: auto;
     }
     .logo-icon {
       width: 80px; height: 80px;
@@ -137,7 +139,7 @@
       min-height: 18px;
     }
     .footer {
-      margin-top: 24px; text-align: center;
+      margin-top: 24px; margin-bottom: auto; text-align: center;
       font-size: 12px; color: rgba(255,255,255,0.35);
     }
     @keyframes fadeInUp {
