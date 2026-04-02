@@ -750,7 +750,7 @@
             `<b>${data.user_name}</b>（${data.employee_id}）<br>` +
             `活动：<b>${data.activity_name}</b><br>` +
             `增加积分：<b>+${data.points_added}</b><br>` +
-            `当前可用积分：<b>${data.new_available}</b>`
+            `当前可用积分：<b>${data.available_points}</b>`
           );
         } else {
           showResultModal('error', '❌', '增加积分失败', data.error || '未知错误');
