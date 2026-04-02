@@ -322,12 +322,12 @@ func ScanActivity(c *gin.Context) {
 				limit, actSum.Total, activity.Points)
 		}
 
-		// 写入活动积分记录
+		// 写入活动积分记录（活动记录不关联商品，ProductID=0 避免外键约束失败）
 		record := models.Redemption{
 			UserID:      user.ID,
 			EmployeeID:  user.EmployeeID,
 			UserName:    user.Name,
-			ProductID:   activity.ID,
+			ProductID:   0,
 			ProductName: activity.Name,
 			Points:      activity.Points,
 			Status:      "success",
