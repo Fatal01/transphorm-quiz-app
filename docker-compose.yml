@@ -4,7 +4,6 @@ services:
   # ── MySQL 8 数据库 ──────────────────────────────────────
   db:
     image: mysql:8.0
-    container_name: quiz_db
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-quizapp2026}
@@ -28,7 +27,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: quiz_app
     restart: unless-stopped
     depends_on:
       db:
