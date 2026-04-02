@@ -1,7 +1,8 @@
 # ── 构建阶段 ──────────────────────────────────────────────
-FROM golang:1.23-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 # MySQL 驱动为纯 Go 实现，无需 CGO，不需要 gcc/sqlite
+
 WORKDIR /app
 
 # 先拉依赖（利用 Docker 层缓存）
