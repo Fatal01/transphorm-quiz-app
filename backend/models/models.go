@@ -2,21 +2,25 @@ package models
 
 import (
 	"time"
+
 	"gorm.io/gorm"
 )
 
 // User 用户模型
 type User struct {
-	ID         uint           `gorm:"primarykey" json:"id"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
-	EmployeeID string         `gorm:"uniqueIndex;not null;size:50" json:"employee_id"` // 工号
-	Name       string         `gorm:"not null;size:100" json:"name"`                   // 姓名
-	IsAdmin    bool           `gorm:"default:false" json:"is_admin"`                   // 是否管理员
-	TotalScore int            `gorm:"default:0" json:"total_score"`                    // 总分（答题得分）
-	Points     int            `gorm:"default:0" json:"points"`                         // 可用积分（用于商城兑换）
-	Office     string         `gorm:"size:100;default:''" json:"office"`               // 办公地点
+	ID              uint           `gorm:"primarykey" json:"id"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	EmployeeID      string         `gorm:"uniqueIndex;not null;size:50" json:"employee_id"` // 工号
+	Name            string         `gorm:"not null;size:100" json:"name"`                   // 姓名
+	IsAdmin         bool           `gorm:"default:false" json:"is_admin"`                   // 是否管理员
+	TotalScore      int            `gorm:"default:0" json:"total_score"`                    // 总分（答题得分，冗余字段）
+	Points          int            `gorm:"default:0" json:"points"`                         // 可用积分（冗余字段，实时同步）
+	ActivityPoints  int            `gorm:"default:0" json:"activity_points"`                // 线下活动获得的积分（冗余字段）
+	UsedPoints      int            `gorm:"default:0" json:"used_points"`                    // 已兑换消耗的积分（冗余字段）
+	QuizScore       int            `gorm:"default:0" json:"quiz_score"`                     // 答题积分（冗余字段，5关全通过=20分）
+	Office          string         `gorm:"size:100;default:''" json:"office"`               // 办公地点
 }
 
 // Score 分数模型（score=100 表示该关卡满分通过）
@@ -37,7 +41,7 @@ type Config struct {
 	ID        uint      `gorm:"primarykey" json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	Key       string    `gorm:"uniqueIndex;not null;size:100" json:"key"`
+	Key       string    `gorm:"column:config_key;uniqueIndex;not null;size:100" json:"key"`
 	Value     string    `gorm:"type:text" json:"value"`
 }
 

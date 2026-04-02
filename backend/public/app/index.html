@@ -227,16 +227,17 @@
     /* 闯关规则按钮 */
     .btn-rules {
       width: 100%; padding: 18px 24px;
-      background: linear-gradient(135deg, rgba(255,165,0,0.2), rgba(255,215,0,0.15));
-      border: 1px solid rgba(255,215,0,0.35);
+      background: linear-gradient(135deg, rgba(255,165,0,0.55), rgba(255,215,0,0.45));
+      border: 1px solid rgba(255,215,0,0.75);
       border-radius: 16px;
-      color: #ffd700; font-size: 17px; font-weight: 600;
+      color: #fff; font-size: 17px; font-weight: 600;
       cursor: pointer; letter-spacing: 1px;
       display: flex; align-items: center; justify-content: center; gap: 10px;
       transition: all 0.3s;
       -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 18px rgba(255,165,0,0.25);
     }
-    .btn-rules:hover { background: linear-gradient(135deg, rgba(255,165,0,0.35), rgba(255,215,0,0.25)); transform: translateY(-1px); }
+    .btn-rules:hover { background: linear-gradient(135deg, rgba(255,165,0,0.72), rgba(255,215,0,0.60)); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,165,0,0.38); }
     .btn-rules:active { transform: translateY(0); }
     .btn-rules .btn-icon { font-size: 22px; }
     .btn-rules .btn-text { display: flex; flex-direction: column; align-items: flex-start; }

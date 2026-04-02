@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  # ── MySQL 8 数据库 ──────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: quiz_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-quizapp2026}
+      MYSQL_DATABASE: ${MYSQL_DB:-quiz_app}
+      MYSQL_USER: ${MYSQL_USER:-quizuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quizpass}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"          # 如不需要外部访问可删除此行
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1",
+             "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:-quizapp2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── 应用服务 ────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quiz_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # 等待 MySQL 健康后再启动
+    environment:
+      # 使用 MYSQL_USER/PASSWORD（非 root）连接，更安全
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-quizuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quizpass}
+      MYSQL_DB: ${MYSQL_DB:-quiz_app}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      TZ: Asia/Shanghai
+    volumes:
+      - static_data:/app/static   # 持久化上传的背景图等文件
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  db_data:
+  static_data:

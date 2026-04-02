@@ -48,6 +48,7 @@ func GetConfig(c *gin.Context) {
 }
 
 // UpdateConfig 更新系统配置（管理员）
+// 注意：Config 模型中 Key 字段映射到数据库列 config_key（避免 MySQL 保留字冲突）
 func UpdateConfig(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,7 +58,8 @@ func UpdateConfig(c *gin.Context) {
 
 	for k, v := range req {
 		var cfg models.Config
-		result := config.DB.Where("key = ?", k).First(&cfg)
+		// 使用实际列名 config_key 避免 MySQL 保留字冲突
+		result := config.DB.Where("config_key = ?", k).First(&cfg)
 		if result.Error != nil {
 			config.DB.Create(&models.Config{Key: k, Value: v})
 		} else {
@@ -96,10 +98,10 @@ func UploadBackground(c *gin.Context) {
 		return
 	}
 
-	// 更新配置
+	// 更新配置（使用实际列名 config_key）
 	imageURL := "/api/static/bg" + ext
 	var cfg models.Config
-	result := config.DB.Where("key = ?", "background_image").First(&cfg)
+	result := config.DB.Where("config_key = ?", "background_image").First(&cfg)
 	if result.Error != nil {
 		config.DB.Create(&models.Config{Key: "background_image", Value: imageURL})
 	} else {

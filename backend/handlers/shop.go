@@ -224,7 +224,19 @@ func DeleteActivity(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "活动删除成功"})
 }
 
+// getActivityPointsLimit 读取线下活动积分上限配置（0=不限制）
+func getActivityPointsLimit() int {
+	var cfg models.Config
+	// 使用实际列名 config_key（Key 字段映射到 config_key 以避免 MySQL 保留字冲突）
+	if err := config.DB.Where("config_key = ?", "activity_points_limit").First(&cfg).Error; err != nil {
+		return 0
+	}
+	limit, _ := strconv.Atoi(cfg.Value)
+	return limit
+}
+
 // ScanActivity 扫码增加活动积分
+// 新增：校验线下活动积分上限（activity_points_limit 配置项，0=不限制）
 func ScanActivity(c *gin.Context) {
 	var req struct {
 		QRData     string `json:"qr_data" binding:"required"`
@@ -294,27 +306,67 @@ func ScanActivity(c *gin.Context) {
 
 	operatorID := c.GetUint("user_id")
 
-	// 写入活动积分记录
-	record := models.Redemption{
-		UserID:      user.ID,
-		EmployeeID:  user.EmployeeID,
-		UserName:    user.Name,
-		ProductID:   activity.ID,
-		ProductName: activity.Name,
-		Points:      activity.Points,
-		Status:      "success",
-		Type:        "activity",
-		Remark:      fmt.Sprintf("活动扫码增加积分（活动：%s）", activity.Name),
-		OperatorID:  operatorID,
-	}
-	if err := config.DB.Create(&record).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "积分记录写入失败"})
+	// 在事务内完成：积分上限校验 + 写入记录 + 同步 User 冗余字段
+	var newActivityPts int
+	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+		// 读取线下活动积分上限
+		limit := getActivityPointsLimit()
+
+		// 查询该用户已获得的线下活动积分总和（FOR UPDATE 行锁）
+		var actSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='activity' AND status='success'", userID).Scan(&actSum)
+
+		if limit > 0 && actSum.Total+activity.Points > limit {
+			return fmt.Errorf("线下活动积分已达上限（上限：%d，当前：%d，本次：%d）",
+				limit, actSum.Total, activity.Points)
+		}
+
+		// 写入活动积分记录
+		record := models.Redemption{
+			UserID:      user.ID,
+			EmployeeID:  user.EmployeeID,
+			UserName:    user.Name,
+			ProductID:   activity.ID,
+			ProductName: activity.Name,
+			Points:      activity.Points,
+			Status:      "success",
+			Type:        "activity",
+			Remark:      fmt.Sprintf("活动扫码增加积分（活动：%s）", activity.Name),
+			OperatorID:  operatorID,
+		}
+		if err := tx.Create(&record).Error; err != nil {
+			return fmt.Errorf("积分记录写入失败")
+		}
+
+		// 同步更新 User 冗余积分字段
+		newActivityPts = actSum.Total + activity.Points
+		quizPts := calcQuizScoreTx(tx, userID)
+		var usedSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
+
+		newPoints := quizPts + newActivityPts - usedSum.Total
+		if newPoints < 0 {
+			newPoints = 0
+		}
+		if err := tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+			"activity_points": newActivityPts,
+			"points":          newPoints,
+		}).Error; err != nil {
+			return fmt.Errorf("用户积分同步失败")
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": txErr.Error()})
 		return
 	}
 
-	_, activityPts, usedPts := getUserPointsBreakdown(userID)
-	quizPts := getQuizScore(userID)
-	newAvailable := quizPts + activityPts - usedPts
+	// 重新读取最新积分
+	var updatedUser models.User
+	config.DB.First(&updatedUser, userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "积分增加成功",
@@ -322,7 +374,7 @@ func ScanActivity(c *gin.Context) {
 		"employee_id":      user.EmployeeID,
 		"activity_name":    activity.Name,
 		"points_added":     activity.Points,
-		"available_points": newAvailable,
+		"available_points": updatedUser.Points,
 	})
 }
 
@@ -350,17 +402,39 @@ func RefundActivity(c *gin.Context) {
 	}
 
 	operatorID := c.GetUint("user_id")
-	if err := config.DB.Model(&record).Updates(map[string]interface{}{
-		"status": "refunded",
-		"remark": fmt.Sprintf("活动积分已退回（操作人ID：%d）", operatorID),
-	}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "退回失败"})
+	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&record).Updates(map[string]interface{}{
+			"status": "refunded",
+			"remark": fmt.Sprintf("活动积分已退回（操作人ID：%d）", operatorID),
+		}).Error; err != nil {
+			return fmt.Errorf("退回失败")
+		}
+
+		// 同步更新 User 冗余积分字段
+		var actSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='activity' AND status='success'", record.UserID).Scan(&actSum)
+		quizPts := calcQuizScoreTx(tx, record.UserID)
+		var usedSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='redeem' AND status='success'", record.UserID).Scan(&usedSum)
+		newPoints := quizPts + actSum.Total - usedSum.Total
+		if newPoints < 0 {
+			newPoints = 0
+		}
+		return tx.Model(&models.User{}).Where("id = ?", record.UserID).Updates(map[string]interface{}{
+			"activity_points": actSum.Total,
+			"points":          newPoints,
+		}).Error
+	})
+
+	if txErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": txErr.Error()})
 		return
 	}
 
-	quizPts := getQuizScore(record.UserID)
-	_, activityPts, usedPts := getUserPointsBreakdown(record.UserID)
-	newAvailable := quizPts + activityPts - usedPts
+	var updatedUser models.User
+	config.DB.First(&updatedUser, record.UserID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "活动积分已退回",
@@ -368,7 +442,7 @@ func RefundActivity(c *gin.Context) {
 		"user_name":     record.UserName,
 		"activity_name": record.ProductName,
 		"points":        record.Points,
-		"new_available": newAvailable,
+		"new_available": updatedUser.Points,
 	})
 }
 
@@ -400,7 +474,8 @@ func GenerateQRCode(c *gin.Context) {
 	})
 }
 
-// RedeemProduct 扫码兑换商品（使用数据库事务保证原子性）
+// RedeemProduct 扫码兑换商品
+// 修复：库存扣减使用 stock > 0 乐观锁条件，防止超卖；同步更新 User 冗余积分字段
 func RedeemProduct(c *gin.Context) {
 	var req struct {
 		QRData    string `json:"qr_data" binding:"required"`
@@ -482,16 +557,16 @@ func RedeemProduct(c *gin.Context) {
 	var rErr *redeemErr
 
 	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
-		// 事务内重新读取商品
+		// 事务内重新读取商品（加行锁）
 		var p models.Product
-		if err := tx.First(&p, req.ProductID).Error; err != nil {
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&p, req.ProductID).Error; err != nil {
 			return fmt.Errorf("商品不存在")
 		}
 		if p.Stock <= 0 {
 			return fmt.Errorf("商品库存不足")
 		}
 
-		// 事务内计算可用积分（答题积分 + 活动积分 - 已兑换）
+		// 事务内计算可用积分
 		quizScore := calcQuizScoreTx(tx, userID)
 		var actSum struct{ Total int }
 		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
@@ -515,8 +590,16 @@ func RedeemProduct(c *gin.Context) {
 			return fmt.Errorf("积分不足")
 		}
 
-		if err := tx.Model(&p).UpdateColumn("stock", gorm.Expr("stock - 1")).Error; err != nil {
+		// 关键修复：使用 stock > 0 条件扣减库存，防止并发超卖
+		result := tx.Model(&models.Product{}).
+			Where("id = ? AND stock > 0", p.ID).
+			UpdateColumn("stock", gorm.Expr("stock - 1"))
+		if result.Error != nil {
 			return fmt.Errorf("库存扣减失败")
+		}
+		if result.RowsAffected == 0 {
+			// 并发情况下库存已被其他请求扣完
+			return fmt.Errorf("商品库存不足（并发冲突）")
 		}
 
 		redemption = models.Redemption{
@@ -527,7 +610,17 @@ func RedeemProduct(c *gin.Context) {
 		if err := tx.Create(&redemption).Error; err != nil {
 			return fmt.Errorf("兑换记录写入失败")
 		}
-		return nil
+
+		// 同步更新 User 冗余积分字段
+		newUsed := usedSum.Total + p.Points
+		newPoints := quizScore + actSum.Total - newUsed
+		if newPoints < 0 {
+			newPoints = 0
+		}
+		return tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+			"used_points": newUsed,
+			"points":      newPoints,
+		}).Error
 	})
 
 	if txErr != nil {
@@ -543,16 +636,15 @@ func RedeemProduct(c *gin.Context) {
 		return
 	}
 
-	quizPts := getQuizScore(userID)
-	_, activityPts, usedPts := getUserPointsBreakdown(userID)
-	newAvailable := quizPts + activityPts - usedPts
+	var updatedUser models.User
+	config.DB.First(&updatedUser, userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "兑换成功",
 		"redemption_id":    redemption.ID,
 		"product_name":     redemption.ProductName,
 		"points_cost":      redemption.Points,
-		"remaining_points": newAvailable,
+		"remaining_points": updatedUser.Points,
 		"user_name":        user.Name,
 		"employee_id":      user.EmployeeID,
 	})
@@ -592,7 +684,23 @@ func RefundRedemption(c *gin.Context) {
 				return fmt.Errorf("恢复库存失败")
 			}
 		}
-		return nil
+
+		// 同步更新 User 冗余积分字段
+		var actSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='activity' AND status='success'", record.UserID).Scan(&actSum)
+		quizPts := calcQuizScoreTx(tx, record.UserID)
+		var usedSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='redeem' AND status='success'", record.UserID).Scan(&usedSum)
+		newPoints := quizPts + actSum.Total - usedSum.Total
+		if newPoints < 0 {
+			newPoints = 0
+		}
+		return tx.Model(&models.User{}).Where("id = ?", record.UserID).Updates(map[string]interface{}{
+			"used_points": usedSum.Total,
+			"points":      newPoints,
+		}).Error
 	})
 
 	if txErr != nil {
@@ -600,9 +708,8 @@ func RefundRedemption(c *gin.Context) {
 		return
 	}
 
-	quizPts := getQuizScore(record.UserID)
-	_, activityPts, usedPts := getUserPointsBreakdown(record.UserID)
-	newAvailable := quizPts + activityPts - usedPts
+	var updatedUser models.User
+	config.DB.First(&updatedUser, record.UserID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "退回成功",
@@ -610,7 +717,7 @@ func RefundRedemption(c *gin.Context) {
 		"user_name":       record.UserName,
 		"product_name":    record.ProductName,
 		"points_refunded": record.Points,
-		"new_available":   newAvailable,
+		"new_available":   updatedUser.Points,
 	})
 }
 
@@ -680,13 +787,17 @@ func GetUserPoints(c *gin.Context) {
 
 	progress := len(passedQuizzes) * 20 // 每关20%
 
+	// 读取线下活动积分上限
+	limit := getActivityPointsLimit()
+
 	c.JSON(http.StatusOK, gin.H{
-		"quiz_score":       quizScore,
-		"activity_points":  actSum.Total,
-		"used_points":      usedSum.Total,
-		"available_points": available,
-		"passed_quizzes":   passedQuizzes,
-		"progress":         progress,
+		"quiz_score":             quizScore,
+		"activity_points":        actSum.Total,
+		"used_points":            usedSum.Total,
+		"available_points":       available,
+		"passed_quizzes":         passedQuizzes,
+		"progress":               progress,
+		"activity_points_limit":  limit,
 		// 兼容旧字段
 		"total_score": quizScore,
 	})
@@ -730,6 +841,69 @@ func GetAllRedemptions(c *gin.Context) {
 	query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&records)
 	c.JSON(http.StatusOK, gin.H{
 		"records": records, "total": total, "page": page, "page_size": pageSize,
+	})
+}
+
+// ========== 统计 API ==========
+
+// GetStats 返回后台统计聚合数据，替代前端大分页请求
+func GetStats(c *gin.Context) {
+	// 总用户数（非管理员）
+	var totalUsers int64
+	config.DB.Model(&models.User{}).Where("is_admin = ?", false).Count(&totalUsers)
+
+	// 全通关用户数
+	var allPassedUsers int64
+	config.DB.Raw(`
+		SELECT COUNT(*) FROM (
+			SELECT user_id FROM scores
+			WHERE score = 100 AND deleted_at IS NULL
+			GROUP BY user_id
+			HAVING COUNT(DISTINCT quiz_index) >= 5
+		) t
+	`).Scan(&allPassedUsers)
+
+	// 总积分发放量（活动 + 答题）
+	var totalActivityPts struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("type='activity' AND status='success'").Scan(&totalActivityPts)
+
+	var totalQuizPts struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("type='quiz' AND status='success'").Scan(&totalQuizPts)
+
+	// 总兑换次数和消耗积分
+	var totalRedeemCount int64
+	config.DB.Model(&models.Redemption{}).Where("type='redeem' AND status='success'").Count(&totalRedeemCount)
+
+	var totalRedeemPts struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("type='redeem' AND status='success'").Scan(&totalRedeemPts)
+
+	// 各办公地点用户数
+	type OfficeCount struct {
+		Office string `json:"office"`
+		Count  int64  `json:"count"`
+	}
+	var officeCounts []OfficeCount
+	config.DB.Model(&models.User{}).
+		Select("office, COUNT(*) as count").
+		Where("is_admin = ?", false).
+		Group("office").
+		Scan(&officeCounts)
+
+	// 线下活动积分上限
+	limit := getActivityPointsLimit()
+
+	c.JSON(http.StatusOK, gin.H{
+		"total_users":          totalUsers,
+		"all_passed_users":     allPassedUsers,
+		"total_activity_pts":   totalActivityPts.Total,
+		"total_quiz_pts":       totalQuizPts.Total,
+		"total_redeem_count":   totalRedeemCount,
+		"total_redeem_pts":     totalRedeemPts.Total,
+		"office_counts":        officeCounts,
+		"activity_points_limit": limit,
 	})
 }
 

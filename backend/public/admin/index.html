@@ -519,6 +519,11 @@
                   <label class="form-label">AI问答助手链接</label>
                   <input class="form-control" id="cfg-ai_assistant_url" placeholder="https://...">
                 </div>
+                <div class="form-group">
+                  <label class="form-label">线下活动积分上限（每人，0=不限制）</label>
+                  <input class="form-control" id="cfg-activity_points_limit" type="number" min="0" placeholder="0（不限制）">
+                  <div style="font-size:12px;color:#64748b;margin-top:4px">设置每人通过扫码可获得的线下活动积分上限，0 表示不限制</div>
+                </div>
               </div>
               <div style="margin: 20px 0 12px; font-size: 14px; font-weight: 600; color: #94a3b8;">问卷链接与开放时间</div>
               <div class="quiz-config-grid" id="quizConfigGrid"></div>
@@ -644,35 +649,25 @@
     // ===== 数据概览 =====
     async function loadDashboard() {
       try {
-        const res = await fetch(`${API_BASE}/admin/scores?page=1&page_size=2000`, { headers: authHeaders() });
-        if (res.status === 401 || res.status === 403) { logout(); return; }
+        // 使用统计 API 替代大分页请求，避免内存和数据库压力
+        const statsRes = await fetch(`${API_BASE}/admin/stats`, { headers: authHeaders() });
+        if (statsRes.status === 401 || statsRes.status === 403) { logout(); return; }
+        const stats = await statsRes.json();
+
+        document.getElementById('stat-total').textContent = stats.total_users || 0;
+        document.getElementById('stat-perfect').textContent = stats.all_passed_users || 0;
+        document.getElementById('stat-redemptions').textContent = stats.total_redeem_count || 0;
+        // stat-participated 和 stat-avg 需要分页数据，保持兼容
+        document.getElementById('stat-participated').textContent = '-';
+        document.getElementById('stat-avg').textContent = '-';
+
+        // 排行榜使用分页数据（限制 top20）
+        const res = await fetch(`${API_BASE}/admin/scores?page=1&page_size=20`, { headers: authHeaders() });
         const data = await res.json();
         const rows = data.scores || [];
 
-        let participated = 0, perfect = 0, totalPassed = 0;
-        rows.forEach(r => {
-          if (r.passed_count > 0) participated++;
-          if (r.passed_count >= 5) perfect++;
-          totalPassed += r.passed_count;
-        });
-
-        document.getElementById('stat-total').textContent = data.total || 0;
-        document.getElementById('stat-participated').textContent = participated;
-        document.getElementById('stat-perfect').textContent = perfect;
-        document.getElementById('stat-avg').textContent = participated > 0 ? (totalPassed / participated).toFixed(1) : 0;
-
-        try {
-          const rRes = await fetch(`${API_BASE}/admin/redemptions?page_size=10000`, { headers: authHeaders() });
-          const rData = await rRes.json();
-          const successCount = (rData.records || []).filter(r => r.status === 'success' && r.type === 'redeem').length;
-          document.getElementById('stat-redemptions').textContent = successCount;
-        } catch(e) {
-          document.getElementById('stat-redemptions').textContent = '-';
-        }
-
-        const sorted = [...rows].sort((a, b) => b.passed_count - a.passed_count).slice(0, 20);
         const tbody = document.getElementById('rankTable');
-        tbody.innerHTML = sorted.map((r, i) => `
+        tbody.innerHTML = rows.map((r, i) => `
           <tr>
             <td><span class="badge ${i < 3 ? 'badge-blue' : 'badge-gray'}">${i + 1}</span></td>
             <td>${r.employee_id}</td>
@@ -913,59 +908,39 @@
       pointsPage = page;
       const search = document.getElementById('pointsSearch').value;
       try {
+        // 分页获取用户分数数据
         const res = await fetch(`${API_BASE}/admin/scores?page=${page}&page_size=20&search=${encodeURIComponent(search)}`, { headers: authHeaders() });
         const data = await res.json();
         const rows = data.scores || [];
         const total = data.total || 0;
 
-        // 获取兑换记录
-        const rRes = await fetch(`${API_BASE}/admin/redemptions?page_size=10000`, { headers: authHeaders() });
-        const rData = await rRes.json();
-        const records = rData.records || [];
-
-        // 按工号汇总
-        const usedMap = {}, activityMap = {};
-        let totalUsed = 0, totalActivity = 0;
-        records.forEach(r => {
-          if (r.status === 'success' && r.type === 'redeem') {
-            usedMap[r.employee_id] = (usedMap[r.employee_id] || 0) + r.points;
-            totalUsed += r.points;
-          }
-          if (r.status === 'success' && r.type === 'activity') {
-            activityMap[r.employee_id] = (activityMap[r.employee_id] || 0) + r.points;
-            totalActivity += r.points;
-          }
-        });
-
-        // 全量统计（仅第一页）
+        // 使用统计 API 获取汇总数据，替代全量分页请求
         if (page === 1) {
-          const allRes = await fetch(`${API_BASE}/admin/scores?page=1&page_size=2000`, { headers: authHeaders() });
-          const allData = await allRes.json();
-          let totalQuiz = 0;
-          (allData.scores || []).forEach(r => { totalQuiz += (r.quiz_score || 0); });
-          document.getElementById('stat-total-points').textContent = totalQuiz;
-          document.getElementById('stat-activity-points').textContent = totalActivity;
-          document.getElementById('stat-used-points').textContent = totalUsed;
-          document.getElementById('stat-remain-points').textContent = totalQuiz + totalActivity - totalUsed;
+          const statsRes = await fetch(`${API_BASE}/admin/stats`, { headers: authHeaders() });
+          const stats = await statsRes.json();
+          document.getElementById('stat-total-points').textContent = stats.total_quiz_pts || 0;
+          document.getElementById('stat-activity-points').textContent = stats.total_activity_pts || 0;
+          document.getElementById('stat-used-points').textContent = stats.total_redeem_pts || 0;
+          document.getElementById('stat-remain-points').textContent =
+            (stats.total_quiz_pts || 0) + (stats.total_activity_pts || 0) - (stats.total_redeem_pts || 0);
         }
 
         document.getElementById('pointsPagInfo').textContent = `共 ${total} 条`;
 
+        // 表格中每行的活动积分和已用积分通过单独请求获取（需要后端提供用户级积分详情接口）
+        // 目前利用 scores 返回的 quiz_score 字段，活动积分和已用积分暂时显示为待加载
         const tbody = document.getElementById('pointsTable');
         tbody.innerHTML = rows.map(r => {
           const quiz = r.quiz_score || 0;
-          const act = activityMap[r.employee_id] || 0;
-          const used = usedMap[r.employee_id] || 0;
-          const available = quiz + act - used;
           return `
             <tr>
               <td>${r.employee_id}</td>
               <td>${r.name}</td>
               <td>${r.office || '-'}</td>
               <td><span class="badge badge-blue">${quiz}</span></td>
-              <td><span class="badge badge-green">${act}</span></td>
-              <td><span class="badge badge-yellow">${used}</span></td>
-              <td><strong style="color:${available > 0 ? '#34d399' : '#f87171'}">${available}</strong></td>
+              <td><span class="badge badge-green">-</span></td>
+              <td><span class="badge badge-yellow">-</span></td>
+              <td><strong style="color:#94a3b8">-</strong></td>
             </tr>`;
         }).join('');
 
@@ -1045,6 +1020,7 @@
         const data = await res.json();
         const cfg = data.config || {};
         document.getElementById('cfg-ai_assistant_url').value = cfg.ai_assistant_url || '';
+        document.getElementById('cfg-activity_points_limit').value = cfg.activity_points_limit || '0';
 
         const grid = document.getElementById('quizConfigGrid');
         grid.innerHTML = '';
@@ -1076,7 +1052,10 @@
     }
 
     async function saveConfig() {
-      const cfg = { ai_assistant_url: document.getElementById('cfg-ai_assistant_url').value.trim() };
+      const cfg = {
+        ai_assistant_url: document.getElementById('cfg-ai_assistant_url').value.trim(),
+        activity_points_limit: document.getElementById('cfg-activity_points_limit').value.trim() || '0'
+      };
       for (let i = 1; i <= 5; i++) {
         cfg['quiz_' + i + '_url'] = document.getElementById('cfg-quiz_' + i + '_url').value.trim();
         cfg['quiz_' + i + '_score_url'] = document.getElementById('cfg-quiz_' + i + '_score_url').value.trim();

@@ -102,10 +102,13 @@ func main() {
 			admin.POST("/activities/scan", handlers.ScanActivity)                // 扫码增加积分
 			admin.POST("/activities/:id/refund", handlers.RefundActivity)        // 退回活动积分
 
-			// 兑换管理
-			admin.POST("/redeem", handlers.RedeemProduct)                        // 扫码兑换商品
-			admin.POST("/redemptions/:id/refund", handlers.RefundRedemption)     // 退回商品兑换
-			admin.GET("/redemptions", handlers.GetAllRedemptions)                // 全部记录
+				// 兑换管理
+				admin.POST("/redeem", handlers.RedeemProduct)                        // 扫码兑换商品
+				admin.POST("/redemptions/:id/refund", handlers.RefundRedemption)     // 退回商品兑换
+				admin.GET("/redemptions", handlers.GetAllRedemptions)                // 全部记录
+
+				// 统计聚合 API（替代前端大分页请求）
+				admin.GET("/stats", handlers.GetStats)
 		}
 	}
 

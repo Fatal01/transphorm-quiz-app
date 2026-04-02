@@ -21,3 +21,6 @@ vendor/
 # 环境变量
 .env
 .env.local
+backend/quiz-server
+backend/quiz-server-new
+data/*.db
