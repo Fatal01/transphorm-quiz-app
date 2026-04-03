@@ -64,6 +64,7 @@ func main() {
 			auth.PUT("/office", handlers.UpdateOffice)            // 更新办公地点
 			auth.GET("/qrcode", handlers.GenerateQRCode)          // 生成兑换二维码
 			auth.GET("/redemptions", handlers.GetUserRedemptions)  // 兑换/积分记录
+			auth.POST("/quiz/auto-pass", handlers.AutoPassQuiz)   // 问卷星满分跳转自动通关
 		}
 
 		// 管理员接口

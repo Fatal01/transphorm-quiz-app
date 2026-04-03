@@ -645,6 +645,16 @@
     </div>
   </div>
 
+  <!-- 通关成功弹窗 -->
+  <div class="modal-overlay center" id="passModal">
+    <div class="modal modal-center" onclick="event.stopPropagation()" style="text-align:center;padding:32px 28px;">
+      <div style="font-size:56px;margin-bottom:12px;">🎉</div>
+      <div style="font-size:20px;font-weight:800;color:#ffd700;margin-bottom:8px;" id="passModalTitle">挑战通过！</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.7);margin-bottom:24px;" id="passModalDesc">恭喜你完成本关挑战！</div>
+      <button onclick="document.getElementById('passModal').classList.remove('show');refreshPoints();" style="background:linear-gradient(135deg,#1a6fd4,#0dd3ff);color:#fff;border:none;border-radius:12px;padding:12px 40px;font-size:15px;font-weight:700;cursor:pointer;width:100%;">太棒了，继续加油！</button>
+    </div>
+  </div>
+
   <script>
     const API_BASE = '/api';
     let appConfig = {};
@@ -682,6 +692,33 @@
 
       // 加载积分和通关状态
       await refreshPoints();
+
+      // 检测是否从问卷星满分跳转过来，自动标记通关
+      await checkAutoPass();
+    }
+
+    async function checkAutoPass() {
+      const referrer = document.referrer;
+      if (!referrer || !referrer.includes('wjx.cn')) return;
+
+      // 防止重复触发：用 sessionStorage 记录本次会话已处理的 referrer
+      const processedKey = 'autopass_' + btoa(referrer).slice(0, 32);
+      if (sessionStorage.getItem(processedKey)) return;
+      sessionStorage.setItem(processedKey, '1');
+
+      try {
+        const res = await fetch(`${API_BASE}/user/quiz/auto-pass`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ referrer })
+        });
+        if (!res.ok) return; // 匹配失败或用户不存在，静默失败
+        const data = await res.json();
+        // 弹窗提示通关成功
+        document.getElementById('passModalTitle').textContent = `「${data.quiz_name}」挑战通过！`;
+        document.getElementById('passModalDesc').textContent = `恭喜 ${data.name}，您已成功完成本阶段挑战！`;
+        document.getElementById('passModal').classList.add('show');
+      } catch(e) {}
     }
 
     async function refreshPoints() {
