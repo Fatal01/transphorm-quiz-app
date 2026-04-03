@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -852,7 +853,7 @@ func GetStats(c *gin.Context) {
 	var totalUsers int64
 	config.DB.Model(&models.User{}).Where("is_admin = ?", false).Count(&totalUsers)
 
-	// 全通关用户数
+	// 全通关用户数（5关全部通过）
 	var allPassedUsers int64
 	config.DB.Raw(`
 		SELECT COUNT(*) FROM (
@@ -862,6 +863,23 @@ func GetStats(c *gin.Context) {
 			HAVING COUNT(DISTINCT quiz_index) >= 5
 		) t
 	`).Scan(&allPassedUsers)
+
+	// 已参与闯关人数（至少通过1关）
+	var participatedUsers int64
+	config.DB.Raw(`
+		SELECT COUNT(DISTINCT user_id) FROM scores
+		WHERE score = 100 AND deleted_at IS NULL
+	`).Scan(&participatedUsers)
+
+	// 平均通关数（所有参与者的平均通过关卡数）
+	var avgPassedQuizzes float64
+	config.DB.Raw(`
+		SELECT COALESCE(AVG(cnt), 0) FROM (
+			SELECT COUNT(DISTINCT quiz_index) as cnt FROM scores
+			WHERE score = 100 AND deleted_at IS NULL
+			GROUP BY user_id
+		) t
+	`).Scan(&avgPassedQuizzes)
 
 	// 总积分发放量（活动 + 答题）
 	var totalActivityPts struct{ Total int }
@@ -896,8 +914,10 @@ func GetStats(c *gin.Context) {
 	limit := getActivityPointsLimit()
 
 	c.JSON(http.StatusOK, gin.H{
-		"total_users":          totalUsers,
-		"all_passed_users":     allPassedUsers,
+		"total_users":           totalUsers,
+		"participated_users":    participatedUsers,
+		"avg_passed_quizzes":    math.Round(avgPassedQuizzes*10) / 10,
+		"all_passed_users":      allPassedUsers,
 		"total_activity_pts":   totalActivityPts.Total,
 		"total_quiz_pts":       totalQuizPts.Total,
 		"total_redeem_count":   totalRedeemCount,

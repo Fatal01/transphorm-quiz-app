@@ -655,11 +655,10 @@
         const stats = await statsRes.json();
 
         document.getElementById('stat-total').textContent = stats.total_users || 0;
+        document.getElementById('stat-participated').textContent = stats.participated_users || 0;
         document.getElementById('stat-perfect').textContent = stats.all_passed_users || 0;
+        document.getElementById('stat-avg').textContent = stats.avg_passed_quizzes != null ? stats.avg_passed_quizzes : '-';
         document.getElementById('stat-redemptions').textContent = stats.total_redeem_count || 0;
-        // stat-participated 和 stat-avg 需要分页数据，保持兼容
-        document.getElementById('stat-participated').textContent = '-';
-        document.getElementById('stat-avg').textContent = '-';
 
         // 排行榜使用分页数据（限制 top20）
         const res = await fetch(`${API_BASE}/admin/scores?page=1&page_size=20`, { headers: authHeaders() });
