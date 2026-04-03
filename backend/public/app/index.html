@@ -698,21 +698,30 @@
     }
 
     async function checkAutoPass() {
-      const referrer = document.referrer;
-      if (!referrer || !referrer.includes('wjx.cn')) return;
+      // 从 URL 参数中读取关卡序号（问卷星每关设置不同的跳转地址，如 /app/?passed=1）
+      const params = new URLSearchParams(window.location.search);
+      const passed = params.get('passed');
+      if (!passed) return;
 
-      // 防止重复触发：用 sessionStorage 记录本次会话已处理的 referrer
-      const processedKey = 'autopass_' + btoa(referrer).slice(0, 32);
+      const quizIndex = parseInt(passed);
+      if (isNaN(quizIndex) || quizIndex < 1 || quizIndex > 5) return;
+
+      // 防止重复触发：用 sessionStorage 记录本次会话已处理的关卡
+      const processedKey = 'autopass_quiz_' + quizIndex;
       if (sessionStorage.getItem(processedKey)) return;
       sessionStorage.setItem(processedKey, '1');
+
+      // 处理完成后清除 URL 参数，避免刷新页面重复触发
+      const cleanURL = window.location.pathname;
+      window.history.replaceState({}, '', cleanURL);
 
       try {
         const res = await fetch(`${API_BASE}/user/quiz/auto-pass`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ referrer })
+          body: JSON.stringify({ quiz_index: quizIndex })
         });
-        if (!res.ok) return; // 匹配失败或用户不存在，静默失败
+        if (!res.ok) return;
         const data = await res.json();
         // 弹窗提示通关成功
         document.getElementById('passModalTitle').textContent = `「${data.quiz_name}」挑战通过！`;

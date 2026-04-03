@@ -3,10 +3,8 @@ package handlers
 import (
 	"bytes"
 	"encoding/csv"
-	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -291,99 +289,60 @@ func UpdateScore(c *gin.Context) {
 }
 
 // AutoPassQuiz 问卷星满分跳转后自动标记通关
-// 前端传入 referrer（问卷星原链接），后端从 referrer 中提取工号（q2参数）和问卷地址（域名+路径）
-// 与数据库中 quiz_1_url ~ quiz_5_url 配对，确认是第几关，再标记该用户通过
+// 前端传入 quiz_index（关卡序号，从 URL 参数 passed=N 获取）
+// 用户身份由 JWT token 确认（已登录用户）
 func AutoPassQuiz(c *gin.Context) {
 	var req struct {
-		Referrer string `json:"referrer" binding:"required"` // 问卷星原链接，如 https://wenjuanxingdenglu.wjx.cn/vm/hzRzbWt.aspx?q1=李四&q2=EMP002
+		QuizIndex int `json:"quiz_index" binding:"required"` // 关卡序号 1-5
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误，需要 referrer 字段"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误，需要 quiz_index 字段"})
 		return
 	}
 
-	// 解析 referrer URL
-	parsedURL, err := url.Parse(req.Referrer)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "referrer 格式无效"})
+	if req.QuizIndex < 1 || req.QuizIndex > 5 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "关卡序号无效（1-5）"})
 		return
 	}
 
-	// 从 q2 参数提取工号
-	employeeID := strings.TrimSpace(parsedURL.Query().Get("q2"))
-	if employeeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "referrer 中未找到工号（q2参数）"})
+	// 从 JWT 中获取当前登录用户
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
 		return
 	}
 
-	// 构造问卷地址的"基础部分"（去掉查询参数，只保留 scheme+host+path）
-	referrerBase := parsedURL.Scheme + "://" + parsedURL.Host + parsedURL.Path
-
-	// 从数据库配置中查找匹配的关卡
-	var configs []models.Config
-	config.DB.Find(&configs)
-	cfgMap := map[string]string{}
-	for _, cfg := range configs {
-		cfgMap[cfg.Key] = cfg.Value
-	}
-
-	quizIndex := 0
-	quizName := ""
-	for i := 1; i <= 5; i++ {
-		configURL := strings.TrimSpace(cfgMap[fmt.Sprintf("quiz_%d_url", i)])
-		if configURL == "" {
-			continue
-		}
-		// 解析配置中的 URL，只比较基础部分（去掉查询参数）
-		parsedConfig, err := url.Parse(configURL)
-		if err != nil {
-			continue
-		}
-		configBase := parsedConfig.Scheme + "://" + parsedConfig.Host + parsedConfig.Path
-		if strings.EqualFold(referrerBase, configBase) {
-			quizIndex = i
-			quizNames := []string{"", "初创期（2006-2011）", "挑战期（2012-2013）", "突破期（2014-2018）", "上升期（2019-2021）", "转型期（2022-至今）"}
-			quizName = quizNames[i]
-			break
-		}
-	}
-
-	if quizIndex == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无法识别问卷来源，请确认问卷URL已在后台配置"})
-		return
-	}
-
-	// 查找用户
 	var user models.User
-	if err := config.DB.Where("employee_id = ?", employeeID).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在: " + employeeID})
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
 
-	// 幂等写入：已通过则直接返回成功
+	quizNames := []string{"", "初创期（2006-2011）", "挑战期（2012-2013）", "突破期（2014-2018）", "上升期（2019-2021）", "转型期（2022-至今）"}
+	quizName := quizNames[req.QuizIndex]
+
+	// 干等写入：已通过则直接返回成功
 	var existing models.Score
-	result := config.DB.Where("user_id = ? AND quiz_index = ?", user.ID, quizIndex).First(&existing)
+	result := config.DB.Where("user_id = ? AND quiz_index = ?", user.ID, req.QuizIndex).First(&existing)
 	if result.Error != nil {
-		// 不存在则创建
 		config.DB.Create(&models.Score{
 			UserID:     user.ID,
-			EmployeeID: employeeID,
-			QuizIndex:  quizIndex,
+			EmployeeID: user.EmployeeID,
+			QuizIndex:  req.QuizIndex,
 			Score:      100,
 		})
 	} else if existing.Score != 100 {
-		// 存在但未通过，更新为通过
 		config.DB.Model(&existing).Update("score", 100)
 	}
 
-	// 检查是否5关全通过，发放奖励
+	// 检查是否 5 关全通过，发放奖励
 	checkAndGrantQuizBonus(user)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "通关成功",
-		"quiz_index": quizIndex,
-		"quiz_name":  quizName,
-		"employee_id": employeeID,
-		"name":       user.Name,
+		"message":     "通关成功",
+		"quiz_index":  req.QuizIndex,
+		"quiz_name":   quizName,
+		"employee_id": user.EmployeeID,
+		"name":        user.Name,
 	})
 }
