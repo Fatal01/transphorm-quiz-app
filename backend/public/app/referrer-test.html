@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Referrer 测试页</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #0d1b3e;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 600px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 20px;
+      color: #0dd3ff;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .row {
+      margin-bottom: 20px;
+    }
+    .label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .value {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      word-break: break-all;
+      line-height: 1.6;
+      min-height: 44px;
+    }
+    .value.empty {
+      color: #ef4444;
+      font-style: italic;
+    }
+    .value.has-value {
+      color: #4ade80;
+    }
+    .tag {
+      display: inline-block;
+      background: rgba(13,211,255,0.15);
+      border: 1px solid rgba(13,211,255,0.3);
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 12px;
+      color: #0dd3ff;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .tag.warn { background: rgba(255,200,0,0.15); border-color: rgba(255,200,0,0.3); color: #ffd700; }
+    .divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      margin: 24px 0;
+    }
+    .tip {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.7;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔍 Referrer 检测结果</h1>
+
+    <div class="row">
+      <div class="label">document.referrer（原始值）</div>
+      <div class="value" id="rawReferrer">检测中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">referrer 域名</div>
+      <div class="value" id="referrerHost">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">referrer 完整路径（含参数）</div>
+      <div class="value" id="referrerFull">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">从 referrer 提取的参数</div>
+      <div class="value" id="referrerParams">-</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="row">
+      <div class="label">当前页面 URL（window.location.href）</div>
+      <div class="value" id="currentURL">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">当前页面 URL 参数（window.location.search）</div>
+      <div class="value" id="currentParams">-</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="tip">
+      💡 <strong>测试方法</strong>：在问卷星后台，将满分跳转地址设置为此页面的完整 URL（如 <code>https://your-domain/app/referrer-test.html</code>），答题满分后跳转过来，查看上方是否能读到 referrer 及其参数。
+    </div>
+  </div>
+
+  <script>
+    const referrer = document.referrer;
+
+    // 原始值
+    const rawEl = document.getElementById('rawReferrer');
+    if (referrer) {
+      rawEl.textContent = referrer;
+      rawEl.className = 'value has-value';
+    } else {
+      rawEl.textContent = '（空）— 浏览器未传递 Referrer';
+      rawEl.className = 'value empty';
+    }
+
+    // 解析 referrer
+    const hostEl = document.getElementById('referrerHost');
+    const fullEl = document.getElementById('referrerFull');
+    const paramsEl = document.getElementById('referrerParams');
+
+    if (referrer) {
+      try {
+        const parsed = new URL(referrer);
+        hostEl.textContent = parsed.host;
+        hostEl.className = 'value has-value';
+
+        fullEl.textContent = parsed.pathname + (parsed.search || '（无查询参数）');
+        fullEl.className = 'value has-value';
+
+        const params = [...parsed.searchParams.entries()];
+        if (params.length > 0) {
+          paramsEl.innerHTML = params.map(([k, v]) =>
+            `<span class="tag">${k} = ${v}</span>`
+          ).join('');
+        } else {
+          paramsEl.innerHTML = '<span class="tag warn">⚠️ 无参数（Referrer Policy 可能只传了域名）</span>';
+        }
+      } catch(e) {
+        hostEl.textContent = '解析失败: ' + e.message;
+        hostEl.className = 'value empty';
+      }
+    } else {
+      hostEl.className = 'value empty';
+      hostEl.textContent = '（无 referrer）';
+      fullEl.className = 'value empty';
+      fullEl.textContent = '（无 referrer）';
+      paramsEl.innerHTML = '<span class="tag warn">⚠️ referrer 为空，无法提取参数</span>';
+    }
+
+    // 当前 URL
+    document.getElementById('currentURL').textContent = window.location.href;
+    document.getElementById('currentURL').className = 'value has-value';
+
+    const search = window.location.search;
+    const currentParamsEl = document.getElementById('currentParams');
+    if (search) {
+      const sp = new URLSearchParams(search);
+      currentParamsEl.innerHTML = [...sp.entries()].map(([k, v]) =>
+        `<span class="tag">${k} = ${v}</span>`
+      ).join('');
+    } else {
+      currentParamsEl.innerHTML = '<span class="tag warn">当前 URL 无参数</span>';
+    }
+  </script>
+</body>
+</html>
