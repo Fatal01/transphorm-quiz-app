@@ -710,15 +710,7 @@
         return;
       }
 
-      // 防止重复触发：用 sessionStorage 记录本次会话已处理的关卡
-      const processedKey = 'autopass_quiz_' + quizIndex;
-      if (sessionStorage.getItem(processedKey)) {
-        console.log('[AutoPass] already processed, skip');
-        return;
-      }
-      sessionStorage.setItem(processedKey, '1');
-
-      // 处理完成后清除 URL 参数，避免刷新页面重复触发
+      // 处理完成后清除 URL 参数，避免刷新页面重复触发（URL 清除后刷新不会再触发，无需 sessionStorage）
       const cleanURL = window.location.pathname;
       window.history.replaceState({}, '', cleanURL);
 
