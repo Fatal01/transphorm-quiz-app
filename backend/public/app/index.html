@@ -690,25 +690,32 @@
         }
       } catch(e) {}
 
+      // 检测是否从问卷星满分跳转过来，自动标记通关（优先执行，不依赖 refreshPoints）
+      await checkAutoPass();
+
       // 加载积分和通关状态
       await refreshPoints();
-
-      // 检测是否从问卷星满分跳转过来，自动标记通关
-      await checkAutoPass();
     }
 
     async function checkAutoPass() {
       // 从 URL 参数中读取关卡序号（问卷星每关设置不同的跳转地址，如 /app/?passed=1）
       const params = new URLSearchParams(window.location.search);
       const passed = params.get('passed');
+      console.log('[AutoPass] passed param:', passed);
       if (!passed) return;
 
       const quizIndex = parseInt(passed);
-      if (isNaN(quizIndex) || quizIndex < 1 || quizIndex > 5) return;
+      if (isNaN(quizIndex) || quizIndex < 1 || quizIndex > 5) {
+        console.log('[AutoPass] invalid quizIndex:', quizIndex);
+        return;
+      }
 
       // 防止重复触发：用 sessionStorage 记录本次会话已处理的关卡
       const processedKey = 'autopass_quiz_' + quizIndex;
-      if (sessionStorage.getItem(processedKey)) return;
+      if (sessionStorage.getItem(processedKey)) {
+        console.log('[AutoPass] already processed, skip');
+        return;
+      }
       sessionStorage.setItem(processedKey, '1');
 
       // 处理完成后清除 URL 参数，避免刷新页面重复触发
@@ -716,18 +723,28 @@
       window.history.replaceState({}, '', cleanURL);
 
       try {
+        console.log('[AutoPass] calling API for quiz_index:', quizIndex);
         const res = await fetch(`${API_BASE}/user/quiz/auto-pass`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ quiz_index: quizIndex })
         });
-        if (!res.ok) return;
+        console.log('[AutoPass] API status:', res.status);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.log('[AutoPass] API error:', errData);
+          return;
+        }
         const data = await res.json();
+        console.log('[AutoPass] API response:', data);
         // 弹窗提示通关成功
         document.getElementById('passModalTitle').textContent = `「${data.quiz_name}」挑战通过！`;
         document.getElementById('passModalDesc').textContent = `恭喜 ${data.name}，您已成功完成本阶段挑战！`;
         document.getElementById('passModal').classList.add('show');
-      } catch(e) {}
+        console.log('[AutoPass] modal shown');
+      } catch(e) {
+        console.error('[AutoPass] ERROR:', e);
+      }
     }
 
     async function refreshPoints() {
