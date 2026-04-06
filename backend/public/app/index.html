@@ -699,6 +699,14 @@
 
     async function checkAutoPass() {
       // 从 URL 参数中读取关卡序号（问卷星每关设置不同的跳转地址，如 /app/?passed=1）
+      // 只允许从问卷星域名跳转过来才触发（防止直接输入 URL 绕过）
+      const referrer = document.referrer;
+      console.log('[AutoPass] referrer:', referrer);
+      if (!referrer.includes('wjx.cn')) {
+        console.log('[AutoPass] 非问卷星来源，忽略');
+        return;
+      }
+
       const params = new URLSearchParams(window.location.search);
       const passed = params.get('passed');
       console.log('[AutoPass] passed param:', passed);
