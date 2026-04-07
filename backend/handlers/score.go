@@ -3,12 +3,15 @@ package handlers
 import (
 	"bytes"
 	"encoding/csv"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/clause"
 	"quiz-app/config"
 	"quiz-app/models"
 )
@@ -110,52 +113,89 @@ func ImportScores(c *gin.Context) {
 }
 
 // checkAndGrantQuizBonus 检查用户是否5关全通过，若是则写入20分答题奖励（幂等）
-// 返回 true 表示本次新发放了奖励
+// 使用事务 + FOR UPDATE 行锁确保幂等性，防止高并发下的竞态条件
+// 返回 true 表示本次新发放了奖励，false 表示未发放（可能是未全通过或已发放过）
 func checkAndGrantQuizBonus(user models.User) bool {
-	var passedCount int64
-	config.DB.Model(&models.Score{}).Where("user_id = ? AND score = 100", user.ID).Count(&passedCount)
-	if passedCount < 5 {
+	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. 检查是否 5 关全通过
+		var passedCount int64
+		tx.Model(&models.Score{}).Where("user_id = ? AND score = 100", user.ID).Count(&passedCount)
+		if passedCount < 5 {
+			return fmt.Errorf("not all passed")
+		}
+
+		// 2. 幂等检查：使用 FOR UPDATE 加行锁，强制并发请求排队
+		// 这确保了检查和写入操作的原子性，防止竞态条件
+		var existing int64
+		tx.Model(&models.Redemption{}).
+			Where("user_id = ? AND type = 'quiz' AND status = 'success'", user.ID).
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Count(&existing)
+		if existing > 0 {
+			return fmt.Errorf("already granted")
+		}
+
+		// 3. 写入答题奖励积分记录
+		if err := tx.Create(&models.Redemption{
+			UserID:      user.ID,
+			EmployeeID:  user.EmployeeID,
+			UserName:    user.Name,
+			ProductID:   0,
+			ProductName: "全通关答题奖励",
+			Points:      20,
+			Status:      "success",
+			Type:        "quiz",
+			Remark:      "5关全部通过，自动发放20积分奖励",
+		}).Error; err != nil {
+			return fmt.Errorf("failed to create redemption record: %w", err)
+		}
+
+		// 4. 同步更新 User 冗余积分字段（动态计算，消除硬编码）
+		quizPts := calcQuizScoreTx(tx, user.ID)
+
+		var actSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='activity' AND status='success'", user.ID).Scan(&actSum)
+
+		var usedSum struct{ Total int }
+		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+			Where("user_id=? AND type='redeem' AND status='success'", user.ID).Scan(&usedSum)
+
+		newPoints := quizPts + actSum.Total - usedSum.Total
+		if newPoints < 0 {
+			newPoints = 0
+		}
+
+		if err := tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
+			"quiz_score": quizPts,
+			"points":     newPoints,
+		}).Error; err != nil {
+			return fmt.Errorf("failed to update user points: %w", err)
+		}
+
+		return nil
+	})
+
+	// 如果事务返回错误，说明未发放奖励（可能是未全通过或已发放过）
+	if txErr != nil {
+		log.Printf("[QUIZ_BONUS] User: %s (ID: %d) - %v", user.EmployeeID, user.ID, txErr)
 		return false
 	}
 
-	// 幂等检查：是否已经发放过答题奖励
-	var existing int64
-	config.DB.Model(&models.Redemption{}).
-		Where("user_id = ? AND type = 'quiz' AND status = 'success'", user.ID).
-		Count(&existing)
-	if existing > 0 {
-		return false
-	}
-
-	// 写入答题奖励积分记录
-	config.DB.Create(&models.Redemption{
-		UserID:      user.ID,
-		EmployeeID:  user.EmployeeID,
-		UserName:    user.Name,
-		ProductID:   0,
-		ProductName: "全通关答题奖励",
-		Points:      20,
-		Status:      "success",
-		Type:        "quiz",
-		Remark:      "5关全部通过，自动发放20积分奖励",
-	})
-
-	// 同步更新 User 冗余积分字段
-	var actSum struct{ Total int }
-	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-		Where("user_id=? AND type='activity' AND status='success'", user.ID).Scan(&actSum)
-	var usedSum struct{ Total int }
-	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-		Where("user_id=? AND type='redeem' AND status='success'", user.ID).Scan(&usedSum)
-	newPoints := 20 + actSum.Total - usedSum.Total
-	if newPoints < 0 {
-		newPoints = 0
-	}
-	config.DB.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
-		"quiz_score": 20,
-		"points":     newPoints,
-	})
+	// 事务成功，说明本次新发放了奖励
+	log.Printf("[QUIZ_BONUS] User: %s (ID: %d) - Bonus granted successfully", user.EmployeeID, user.ID)
 	return true
+}
+
+// calcQuizScoreTx 在事务内计算答题积分
+// 返回 20 表示 5 关全通过，否则返回 0
+func calcQuizScoreTx(tx *gorm.DB, userID uint) int {
+	var passedCount int64
+	tx.Model(&models.Score{}).Where("user_id = ? AND score = 100", userID).Count(&passedCount)
+	if passedCount >= 5 {
+		return 20
+	}
+	return 0
 }
 
 // GetScores 管理员获取所有用户通过状态
