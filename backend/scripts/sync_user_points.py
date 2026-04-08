@@ -111,6 +111,7 @@ def sync_user_points(conn: pymysql.Connection) -> None:
     cursor = conn.cursor()
 
     # 获取所有非管理员用户
+    # users 表有 deleted_at 字段（GORM 软删除），需要过滤已删除用户
     cursor.execute(
         "SELECT id, employee_id, name, quiz_score, activity_points, used_points, points "
         "FROM users WHERE is_admin = 0 AND deleted_at IS NULL"
@@ -129,10 +130,11 @@ def sync_user_points(conn: pymysql.Connection) -> None:
         try:
             # ── 从 Redemption 表计算各类积分（与 SyncUserPointsTx 逻辑一致）──
 
+            # redemptions 表没有 deleted_at 字段（流水表不做软删除）
             cursor.execute(
                 "SELECT COALESCE(SUM(points), 0) AS total "
                 "FROM redemptions "
-                "WHERE user_id = %s AND type = 'quiz' AND status = 'success' AND deleted_at IS NULL",
+                "WHERE user_id = %s AND type = 'quiz' AND status = 'success'",
                 (uid,)
             )
             quiz_score = cursor.fetchone()["total"]
@@ -140,7 +142,7 @@ def sync_user_points(conn: pymysql.Connection) -> None:
             cursor.execute(
                 "SELECT COALESCE(SUM(points), 0) AS total "
                 "FROM redemptions "
-                "WHERE user_id = %s AND type = 'activity' AND status = 'success' AND deleted_at IS NULL",
+                "WHERE user_id = %s AND type = 'activity' AND status = 'success'",
                 (uid,)
             )
             activity_points = cursor.fetchone()["total"]
@@ -148,7 +150,7 @@ def sync_user_points(conn: pymysql.Connection) -> None:
             cursor.execute(
                 "SELECT COALESCE(SUM(points), 0) AS total "
                 "FROM redemptions "
-                "WHERE user_id = %s AND type = 'redeem' AND status = 'success' AND deleted_at IS NULL",
+                "WHERE user_id = %s AND type = 'redeem' AND status = 'success'",
                 (uid,)
             )
             used_points = cursor.fetchone()["total"]
