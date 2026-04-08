@@ -340,21 +340,8 @@ func ScanActivity(c *gin.Context) {
 			return fmt.Errorf("积分记录写入失败")
 		}
 
-		// 同步更新 User 冗余积分字段
-		newActivityPts = actSum.Total + activity.Points
-		quizPts := calcQuizScoreTx(tx, userID)
-		var usedSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
-
-		newPoints := quizPts + newActivityPts - usedSum.Total
-		if newPoints < 0 {
-			newPoints = 0
-		}
-		if err := tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-			"activity_points": newActivityPts,
-			"points":          newPoints,
-		}).Error; err != nil {
+		// 全量重算并同步 User 冗余积分字段
+		if err := SyncUserPointsTx(tx, userID); err != nil {
 			return fmt.Errorf("用户积分同步失败")
 		}
 		return nil
@@ -411,22 +398,8 @@ func RefundActivity(c *gin.Context) {
 			return fmt.Errorf("退回失败")
 		}
 
-		// 同步更新 User 冗余积分字段
-		var actSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='activity' AND status='success'", record.UserID).Scan(&actSum)
-		quizPts := calcQuizScoreTx(tx, record.UserID)
-		var usedSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='redeem' AND status='success'", record.UserID).Scan(&usedSum)
-		newPoints := quizPts + actSum.Total - usedSum.Total
-		if newPoints < 0 {
-			newPoints = 0
-		}
-		return tx.Model(&models.User{}).Where("id = ?", record.UserID).Updates(map[string]interface{}{
-			"activity_points": actSum.Total,
-			"points":          newPoints,
-		}).Error
+		// 全量重算并同步 User 冗余积分字段
+		return SyncUserPointsTx(tx, record.UserID)
 	})
 
 	if txErr != nil {
@@ -612,16 +585,8 @@ func RedeemProduct(c *gin.Context) {
 			return fmt.Errorf("兑换记录写入失败")
 		}
 
-		// 同步更新 User 冗余积分字段
-		newUsed := usedSum.Total + p.Points
-		newPoints := quizScore + actSum.Total - newUsed
-		if newPoints < 0 {
-			newPoints = 0
-		}
-		return tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-			"used_points": newUsed,
-			"points":      newPoints,
-		}).Error
+		// 全量重算并同步 User 冗余积分字段
+		return SyncUserPointsTx(tx, userID)
 	})
 
 	if txErr != nil {
@@ -686,22 +651,8 @@ func RefundRedemption(c *gin.Context) {
 			}
 		}
 
-		// 同步更新 User 冗余积分字段
-		var actSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='activity' AND status='success'", record.UserID).Scan(&actSum)
-		quizPts := calcQuizScoreTx(tx, record.UserID)
-		var usedSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='redeem' AND status='success'", record.UserID).Scan(&usedSum)
-		newPoints := quizPts + actSum.Total - usedSum.Total
-		if newPoints < 0 {
-			newPoints = 0
-		}
-		return tx.Model(&models.User{}).Where("id = ?", record.UserID).Updates(map[string]interface{}{
-			"used_points": usedSum.Total,
-			"points":      newPoints,
-		}).Error
+		// 全量重算并同步 User 冗余积分字段
+		return SyncUserPointsTx(tx, record.UserID)
 	})
 
 	if txErr != nil {
@@ -742,6 +693,46 @@ func calcQuizScoreTx(tx *gorm.DB, userID uint) int {
 		return 20
 	}
 	return 0
+}
+
+// SyncUserPointsTx 在事务内全量重算并同步 User 表的所有积分冗余字段。
+// 所有会产生积分变动的操作（扫码、退回、兑换、退回兑换、答题奖励）都必须在同一事务中调用此函数，
+// 以保证 Redemption 流水表与 User 冗余字段的强一致性。
+func SyncUserPointsTx(tx *gorm.DB, userID uint) error {
+	// 1. 答题积分：从 Redemption 表读取（与 Score 表保持一致）
+	var quizSum struct{ Total int }
+	tx.Model(&models.Redemption{}).
+		Select("COALESCE(SUM(points),0) as total").
+		Where("user_id = ? AND type = 'quiz' AND status = 'success'", userID).
+		Scan(&quizSum)
+
+	// 2. 线下活动积分
+	var actSum struct{ Total int }
+	tx.Model(&models.Redemption{}).
+		Select("COALESCE(SUM(points),0) as total").
+		Where("user_id = ? AND type = 'activity' AND status = 'success'", userID).
+		Scan(&actSum)
+
+	// 3. 已兑换消耗积分
+	var usedSum struct{ Total int }
+	tx.Model(&models.Redemption{}).
+		Select("COALESCE(SUM(points),0) as total").
+		Where("user_id = ? AND type = 'redeem' AND status = 'success'", userID).
+		Scan(&usedSum)
+
+	// 4. 可用积分 = 答题 + 活动 - 已兑换
+	availablePoints := quizSum.Total + actSum.Total - usedSum.Total
+	if availablePoints < 0 {
+		availablePoints = 0
+	}
+
+	// 5. 一次性更新所有冗余字段，确保与 Redemption 表完全一致
+	return tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"quiz_score":      quizSum.Total,
+		"activity_points": actSum.Total,
+		"used_points":     usedSum.Total,
+		"points":          availablePoints,
+	}).Error
 }
 
 // getUserPointsBreakdown 返回 (quiz积分, activity积分, 已兑换积分)

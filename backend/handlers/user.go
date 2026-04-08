@@ -99,6 +99,8 @@ func UpdateOffice(c *gin.Context) {
 }
 
 // GetProfile 获取当前用户信息和分数
+// 注意：total_score 返回的是积分系统中的答题积分（5关全通过=20分），
+// 而非各关卡原始分数（0-100）的累加。如需查看完整积分明细，请使用 /api/user/points 接口。
 func GetProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -114,15 +116,12 @@ func GetProfile(c *gin.Context) {
 		scoreMap[s.QuizIndex] = s.Score
 	}
 
-	total := 0
-	for _, v := range scoreMap {
-		total += v
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"user":        user,
-		"scores":      scoreMap,
-		"total_score": total,
+		"user":   user,
+		"scores": scoreMap,
+		// total_score 为积分系统中的答题积分，与 user.quiz_score 一致
+		// 不再是各关卡原始分数的累加（最高500），避免前端展示混淆
+		"total_score": user.QuizScore,
 	})
 }
 
