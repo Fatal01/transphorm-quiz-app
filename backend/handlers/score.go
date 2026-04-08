@@ -150,27 +150,9 @@ func checkAndGrantQuizBonus(user models.User) bool {
 			return fmt.Errorf("failed to create redemption record: %w", err)
 		}
 
-		// 4. 同步更新 User 冗余积分字段（动态计算，消除硬编码）
-		quizPts := calcQuizScoreTx(tx, user.ID)
-
-		var actSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='activity' AND status='success'", user.ID).Scan(&actSum)
-
-		var usedSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='redeem' AND status='success'", user.ID).Scan(&usedSum)
-
-		newPoints := quizPts + actSum.Total - usedSum.Total
-		if newPoints < 0 {
-			newPoints = 0
-		}
-
-		if err := tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
-			"quiz_score": quizPts,
-			"points":     newPoints,
-		}).Error; err != nil {
-			return fmt.Errorf("failed to update user points: %w", err)
+		// 4. 全量重算并同步 User 冗余积分字段
+		if err := SyncUserPointsTx(tx, user.ID); err != nil {
+			return fmt.Errorf("failed to sync user points: %w", err)
 		}
 
 		return nil
@@ -185,17 +167,6 @@ func checkAndGrantQuizBonus(user models.User) bool {
 	// 事务成功，说明本次新发放了奖励
 	log.Printf("[QUIZ_BONUS] User: %s (ID: %d) - Bonus granted successfully", user.EmployeeID, user.ID)
 	return true
-}
-
-// calcQuizScoreTx 在事务内计算答题积分
-// 返回 20 表示 5 关全通过，否则返回 0
-func calcQuizScoreTx(tx *gorm.DB, userID uint) int {
-	var passedCount int64
-	tx.Model(&models.Score{}).Where("user_id = ? AND score = 100", userID).Count(&passedCount)
-	if passedCount >= 5 {
-		return 20
-	}
-	return 0
 }
 
 // GetScores 管理员获取所有用户通过状态
