@@ -308,7 +308,6 @@ func ScanActivity(c *gin.Context) {
 	operatorID := c.GetUint("user_id")
 
 	// 在事务内完成：积分上限校验 + 写入记录 + 同步 User 冗余字段
-	var newActivityPts int
 	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
 		// 读取线下活动积分上限
 		limit := getActivityPointsLimit()
