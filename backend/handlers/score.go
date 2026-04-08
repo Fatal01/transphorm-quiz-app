@@ -11,7 +11,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/clause"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"quiz-app/config"
 	"quiz-app/models"
 )
