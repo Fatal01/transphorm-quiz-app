@@ -313,9 +313,9 @@ func ExportUsers(c *gin.Context) {
 	})
 
 	for _, u := range users {
+		// 各关卡通过状态：从 Score 表读取（展示用）
 		var scores []models.Score
 		config.DB.Where("user_id = ?", u.ID).Find(&scores)
-
 		passMap := map[int]string{}
 		for _, s := range scores {
 			if s.Score == 100 {
@@ -325,33 +325,12 @@ func ExportUsers(c *gin.Context) {
 			}
 		}
 
-		// 统计答题积分（5关全通过得20分）
-		passedCount := 0
-		for i := 1; i <= 5; i++ {
-			if passMap[i] == "通过" {
-				passedCount++
-			}
+		// 积分明细：全部从 Redemption 表读取，与后台管理页面和用户端接口数据来源一致
+		quizScore, actPts, usedPts := getUserPointsBreakdown(u.ID)
+		available := quizScore + actPts - usedPts
+		if available < 0 {
+			available = 0
 		}
-		quizScore := 0
-		if passedCount == 5 {
-			quizScore = 20
-		}
-
-		// 活动积分
-		var activitySum struct{ Total int }
-		config.DB.Model(&models.Redemption{}).
-			Select("COALESCE(SUM(points), 0) as total").
-			Where("user_id = ? AND type = 'activity' AND status = 'success'", u.ID).
-			Scan(&activitySum)
-
-		// 已兑换
-		var usedSum struct{ Total int }
-		config.DB.Model(&models.Redemption{}).
-			Select("COALESCE(SUM(points), 0) as total").
-			Where("user_id = ? AND type = 'redeem' AND status = 'success'", u.ID).
-			Scan(&usedSum)
-
-		available := quizScore + activitySum.Total - usedSum.Total
 
 		row := []string{
 			u.EmployeeID,
@@ -363,8 +342,8 @@ func ExportUsers(c *gin.Context) {
 			passMap[4],
 			passMap[5],
 			strconv.Itoa(quizScore),
-			strconv.Itoa(activitySum.Total),
-			strconv.Itoa(usedSum.Total),
+			strconv.Itoa(actPts),
+			strconv.Itoa(usedPts),
 			strconv.Itoa(available),
 		}
 		w.Write(row)

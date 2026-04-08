@@ -540,18 +540,8 @@ func RedeemProduct(c *gin.Context) {
 			return fmt.Errorf("商品库存不足")
 		}
 
-		// 事务内计算可用积分
-		quizScore := calcQuizScoreTx(tx, userID)
-		var actSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='activity' AND status='success'", userID).Scan(&actSum)
-		var usedSum struct{ Total int }
-		tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-			Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
-		available := quizScore + actSum.Total - usedSum.Total
-		if available < 0 {
-			available = 0
-		}
+		// 事务内计算可用积分（在写入 Redemption 记录之前校验余额）
+		available := calcAvailablePointsTx(tx, userID)
 
 		if available < p.Points {
 			tx.Create(&models.Redemption{
@@ -735,9 +725,12 @@ func SyncUserPointsTx(tx *gorm.DB, userID uint) error {
 	}).Error
 }
 
-// getUserPointsBreakdown 返回 (quiz积分, activity积分, 已兑换积分)
+// getUserPointsBreakdown 返回 (quiz积分, activity积分, 已兑换积分)。
+// 所有积分均从 Redemption 表读取，与 SyncUserPointsTx 数据来源保持一致。
 func getUserPointsBreakdown(userID uint) (int, int, int) {
-	quizScore := getQuizScore(userID)
+	var quizSum struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='quiz' AND status='success'", userID).Scan(&quizSum)
 
 	var actSum struct{ Total int }
 	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
@@ -747,24 +740,36 @@ func getUserPointsBreakdown(userID uint) (int, int, int) {
 	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
 		Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
 
-	return quizScore, actSum.Total, usedSum.Total
+	return quizSum.Total, actSum.Total, usedSum.Total
+}
+
+// calcAvailablePointsTx 在事务内计算用户当前可用积分。
+// 专用于写入前的余额校验（如兑换前判断积分是否足够），
+// 此时 Redemption 记录尚未写入，因此不能复用 SyncUserPointsTx。
+func calcAvailablePointsTx(tx *gorm.DB, userID uint) int {
+	quizPts := calcQuizScoreTx(tx, userID)
+
+	var actSum struct{ Total int }
+	tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='activity' AND status='success'", userID).Scan(&actSum)
+
+	var usedSum struct{ Total int }
+	tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
+
+	available := quizPts + actSum.Total - usedSum.Total
+	if available < 0 {
+		available = 0
+	}
+	return available
 }
 
 // GetUserPoints 获取当前用户积分详情
 func GetUserPoints(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
-	quizScore := getQuizScore(userID)
-
-	var actSum struct{ Total int }
-	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-		Where("user_id=? AND type='activity' AND status='success'", userID).Scan(&actSum)
-
-	var usedSum struct{ Total int }
-	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
-		Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
-
-	available := quizScore + actSum.Total - usedSum.Total
+	quizScore, actPts, usedPts := getUserPointsBreakdown(userID)
+	available := quizScore + actPts - usedPts
 	if available < 0 {
 		available = 0
 	}
@@ -783,13 +788,13 @@ func GetUserPoints(c *gin.Context) {
 	limit := getActivityPointsLimit()
 
 	c.JSON(http.StatusOK, gin.H{
-		"quiz_score":             quizScore,
-		"activity_points":        actSum.Total,
-		"used_points":            usedSum.Total,
-		"available_points":       available,
-		"passed_quizzes":         passedQuizzes,
-		"progress":               progress,
-		"activity_points_limit":  limit,
+		"quiz_score":            quizScore,
+		"activity_points":       actPts,
+		"used_points":           usedPts,
+		"available_points":      available,
+		"passed_quizzes":        passedQuizzes,
+		"progress":              progress,
+		"activity_points_limit": limit,
 		// 兼容旧字段
 		"total_score": quizScore,
 	})
