@@ -114,7 +114,7 @@ def sync_user_points(conn: pymysql.Connection) -> None:
     # 获取所有非管理员用户
     # users 表有 deleted_at 字段（GORM 软删除），需要过滤已删除用户
     cursor.execute(
-        "SELECT id, employee_id, name, quiz_score, activity_points, used_points, points "
+        "SELECT id, employee_id, name, quiz_score, activity_points, used_points, initial_points, points "
         "FROM users WHERE is_admin = 0 AND deleted_at IS NULL"
     )
     users = cursor.fetchall()
@@ -168,10 +168,11 @@ def sync_user_points(conn: pymysql.Connection) -> None:
             if available_points < 0:
                 available_points = 0
 
-            # ── 检查是否需要修复 ────────────────────────────────────
+            # ── 检查是否需要修复 ────────────────────
             needs_fix = (
                 user["quiz_score"]      != quiz_score      or
                 user["activity_points"] != activity_points or
+                user["initial_points"]  != initial_points  or
                 user["used_points"]     != used_points     or
                 user["points"]          != available_points
             )
@@ -184,16 +185,18 @@ def sync_user_points(conn: pymysql.Connection) -> None:
                 "UPDATE users SET "
                 "  quiz_score = %s, "
                 "  activity_points = %s, "
+                "  initial_points = %s, "
                 "  used_points = %s, "
                 "  points = %s "
                 "WHERE id = %s",
-                (quiz_score, activity_points, used_points, available_points, uid)
+                (quiz_score, activity_points, initial_points, used_points, available_points, uid)
             )
             conn.commit()
 
             print(f"[FIXED] 用户 {name:<10} ({employee_id})")
             print(f"        quiz_score:      {user['quiz_score']} -> {quiz_score}")
             print(f"        activity_points: {user['activity_points']} -> {activity_points}")
+            print(f"        initial_points:  {user['initial_points']} -> {initial_points}")
             print(f"        used_points:     {user['used_points']} -> {used_points}")
             print(f"        points:          {user['points']} -> {available_points}")
             fixed_count += 1

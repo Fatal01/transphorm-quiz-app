@@ -153,11 +153,36 @@ func GetAllUsers(c *gin.Context) {
 		models.User
 		PassedCount int `json:"passed_count"`
 	}
+
+	// 批量查询通关数，避免 N+1
+	userIDs := make([]uint, 0, len(users))
+	for _, u := range users {
+		userIDs = append(userIDs, u.ID)
+	}
+
+	type passRow struct {
+		UserID uint
+		Cnt    int
+	}
+	var passRows []passRow
+	if len(userIDs) > 0 {
+		config.DB.Model(&models.Score{}).
+			Select("user_id, COUNT(*) as cnt").
+			Where("user_id IN ? AND score = 100", userIDs).
+			Group("user_id").
+			Scan(&passRows)
+	}
+	passMap := make(map[uint]int, len(passRows))
+	for _, r := range passRows {
+		passMap[r.UserID] = r.Cnt
+	}
+
 	var resultList []UserWithScore
 	for _, u := range users {
-		var passed int64
-		config.DB.Model(&models.Score{}).Where("user_id = ? AND score = 100", u.ID).Count(&passed)
-		resultList = append(resultList, UserWithScore{User: u, PassedCount: int(passed)})
+		resultList = append(resultList, UserWithScore{
+			User:        u,
+			PassedCount: passMap[u.ID],
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{

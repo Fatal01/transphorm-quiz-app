@@ -726,6 +726,7 @@ func SyncUserPointsTx(tx *gorm.DB, userID uint) error {
 	return tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"quiz_score":      quizSum.Total,
 		"activity_points": actSum.Total,
+		"initial_points":  initSum.Total,
 		"used_points":     usedSum.Total,
 		"points":          availablePoints,
 	}).Error

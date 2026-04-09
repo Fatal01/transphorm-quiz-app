@@ -20,6 +20,7 @@ type User struct {
 	ActivityPoints  int            `gorm:"default:0" json:"activity_points"`                // 线下活动获得的积分（冗余字段）
 	UsedPoints      int            `gorm:"default:0" json:"used_points"`                    // 已兑换消耗的积分（冗余字段）
 	QuizScore       int            `gorm:"default:0" json:"quiz_score"`                     // 答题积分（冗余字段，5关全通过=20分）
+	InitialPoints   int            `gorm:"default:0" json:"initial_points"`                 // 初始积分（冗余字段，由管理员批量发放）
 	Office          string         `gorm:"size:100;default:''" json:"office"`               // 办公地点
 }
 
@@ -84,7 +85,7 @@ type Redemption struct {
 	ProductName string    `gorm:"not null;size:200" json:"product_name"`
 	Points      int       `gorm:"not null" json:"points"`                           // 消耗/获得积分
 	Status      string    `gorm:"not null;size:20;default:'success'" json:"status"` // success / failed / refunded
-	Type        string    `gorm:"not null;size:20;default:'redeem'" json:"type"`    // redeem=兑换商品 / activity=活动积分 / quiz=答题奖励
+	Type        string    `gorm:"not null;size:20;default:'redeem'" json:"type"`    // redeem=兑换商品 / activity=活动积分 / quiz=答题奖励 / initial=初始积分
 	Remark      string    `gorm:"size:500" json:"remark"`                           // 备注
 	OperatorID  uint      `gorm:"default:0" json:"operator_id"`                     // 操作人ID（管理员）
 	User        User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
