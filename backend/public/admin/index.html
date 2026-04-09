@@ -665,8 +665,8 @@
         document.getElementById('stat-avg').textContent = stats.avg_passed_quizzes != null ? stats.avg_passed_quizzes : '-';
         document.getElementById('stat-redemptions').textContent = stats.total_redeem_count || 0;
 
-        // 排行榜使用分页数据（限制 top20）
-        const res = await fetch(`${API_BASE}/admin/scores?page=1&page_size=20`, { headers: authHeaders() });
+        // 排行榜：调用专用接口，按通关数量降序排列前20名
+        const res = await fetch(`${API_BASE}/admin/scores/top`, { headers: authHeaders() });
         const data = await res.json();
         const rows = data.scores || [];
 

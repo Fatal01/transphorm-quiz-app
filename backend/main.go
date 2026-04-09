@@ -79,10 +79,11 @@ func main() {
 				admin.GET("/users/export", handlers.ExportUsers)
 				admin.POST("/users/grant-initial-points", handlers.GrantInitialPoints) // 批量发放初始积分
 
-			// 分数/通过状态管理
-			admin.GET("/scores", handlers.GetScores)
-			admin.POST("/scores/import/:quiz_index", handlers.ImportScores)
-			admin.PUT("/scores", handlers.UpdateScore)
+				// 分数/通过状态管理
+				admin.GET("/scores", handlers.GetScores)
+				admin.GET("/scores/top", handlers.GetTopScores) // 排行榜：按通关数降序前20名
+				admin.POST("/scores/import/:quiz_index", handlers.ImportScores)
+				admin.PUT("/scores", handlers.UpdateScore)
 
 			// 系统配置
 			admin.GET("/config", handlers.GetConfig)

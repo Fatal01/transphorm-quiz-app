@@ -171,6 +171,78 @@ func checkAndGrantQuizBonus(user models.User) bool {
 }
 
 // GetScores 管理员获取所有用户通过状态
+// scoreRow 是 GetScores 和 GetTopScores 共用的返回结构体
+type scoreRow struct {
+	UserID      uint   `json:"user_id"`
+	EmployeeID  string `json:"employee_id"`
+	Name        string `json:"name"`
+	Office      string `json:"office"`
+	Quiz1       bool   `json:"quiz_1"`
+	Quiz2       bool   `json:"quiz_2"`
+	Quiz3       bool   `json:"quiz_3"`
+	Quiz4       bool   `json:"quiz_4"`
+	Quiz5       bool   `json:"quiz_5"`
+	PassedCount int    `json:"passed_count"`
+	QuizScore   int    `json:"quiz_score"`
+}
+
+// buildScoreRows 将用户列表与其关卡通过状态合并为 ScoreRow 列表。
+// 使用一次批量查询替代逐用户循环查询，避免 N+1 问题。
+func buildScoreRows(users []models.User) []scoreRow {
+	if len(users) == 0 {
+		return []scoreRow{}
+	}
+
+	// 收集所有 userID
+	userIDs := make([]uint, len(users))
+	for i, u := range users {
+		userIDs[i] = u.ID
+	}
+
+	// 一次批量查询所有相关 Score 记录
+	var allScores []models.Score
+	config.DB.Where("user_id IN ?", userIDs).Find(&allScores)
+
+	// 构建 userID -> passMap 的映射
+	passMaps := map[uint]map[int]bool{}
+	for _, s := range allScores {
+		if passMaps[s.UserID] == nil {
+			passMaps[s.UserID] = map[int]bool{}
+		}
+		passMaps[s.UserID][s.QuizIndex] = (s.Score == 100)
+	}
+
+	rows := make([]scoreRow, 0, len(users))
+	for _, u := range users {
+		pm := passMaps[u.ID]
+		passed := 0
+		for i := 1; i <= 5; i++ {
+			if pm[i] {
+				passed++
+			}
+		}
+		quizScore := 0
+		if passed == 5 {
+			quizScore = 20
+		}
+		rows = append(rows, scoreRow{
+			UserID:      u.ID,
+			EmployeeID:  u.EmployeeID,
+			Name:        u.Name,
+			Office:      u.Office,
+			Quiz1:       pm[1],
+			Quiz2:       pm[2],
+			Quiz3:       pm[3],
+			Quiz4:       pm[4],
+			Quiz5:       pm[5],
+			PassedCount: passed,
+			QuizScore:   quizScore,
+		})
+	}
+	return rows
+}
+
+// GetScores 管理员获取分页成绩列表（支持搜索）
 func GetScores(c *gin.Context) {
 	search := c.Query("search")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -183,20 +255,6 @@ func GetScores(c *gin.Context) {
 		pageSize = 20
 	}
 
-	type ScoreRow struct {
-		UserID      uint   `json:"user_id"`
-		EmployeeID  string `json:"employee_id"`
-		Name        string `json:"name"`
-		Office      string `json:"office"`
-		Quiz1       bool   `json:"quiz_1"` // true=通过
-		Quiz2       bool   `json:"quiz_2"`
-		Quiz3       bool   `json:"quiz_3"`
-		Quiz4       bool   `json:"quiz_4"`
-		Quiz5       bool   `json:"quiz_5"`
-		PassedCount int    `json:"passed_count"`
-		QuizScore   int    `json:"quiz_score"` // 答题积分（全通过得20）
-	}
-
 	var users []models.User
 	var total int64
 	query := config.DB.Model(&models.User{}).Where("is_admin = ?", false)
@@ -206,49 +264,56 @@ func GetScores(c *gin.Context) {
 	query.Count(&total)
 	query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&users)
 
-	var rows []ScoreRow
-	for _, u := range users {
-		var scores []models.Score
-		config.DB.Where("user_id = ?", u.ID).Find(&scores)
-
-		passMap := map[int]bool{}
-		for _, s := range scores {
-			passMap[s.QuizIndex] = (s.Score == 100)
-		}
-
-		passed := 0
-		for i := 1; i <= 5; i++ {
-			if passMap[i] {
-				passed++
-			}
-		}
-
-		quizScore := 0
-		if passed == 5 {
-			quizScore = 20
-		}
-
-		rows = append(rows, ScoreRow{
-			UserID:      u.ID,
-			EmployeeID:  u.EmployeeID,
-			Name:        u.Name,
-			Office:      u.Office,
-			Quiz1:       passMap[1],
-			Quiz2:       passMap[2],
-			Quiz3:       passMap[3],
-			Quiz4:       passMap[4],
-			Quiz5:       passMap[5],
-			PassedCount: passed,
-			QuizScore:   quizScore,
-		})
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"scores":    rows,
+		"scores":    buildScoreRows(users),
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
 	})
+}
+
+// GetTopScores 获取按通关数量降序排列的前 20 名用户（专用于概览页排行榜）
+func GetTopScores(c *gin.Context) {
+	// 使用单条 SQL 完成聚合和排序，避免 N+1 查询
+	type topRow struct {
+		ID          uint   `json:"id"`
+		EmployeeID  string `json:"employee_id"`
+		Name        string `json:"name"`
+		Office      string `json:"office"`
+		PassedCount int    `json:"passed_count"`
+		Quiz1       bool   `json:"quiz_1"`
+		Quiz2       bool   `json:"quiz_2"`
+		Quiz3       bool   `json:"quiz_3"`
+		Quiz4       bool   `json:"quiz_4"`
+		Quiz5       bool   `json:"quiz_5"`
+	}
+
+	var topUsers []topRow
+	config.DB.Raw(`
+		SELECT
+			u.id,
+			u.employee_id,
+			u.name,
+			u.office,
+			COUNT(CASE WHEN s.score = 100 THEN 1 END) AS passed_count,
+			MAX(CASE WHEN s.quiz_index = 1 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_1,
+			MAX(CASE WHEN s.quiz_index = 2 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_2,
+			MAX(CASE WHEN s.quiz_index = 3 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_3,
+			MAX(CASE WHEN s.quiz_index = 4 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_4,
+			MAX(CASE WHEN s.quiz_index = 5 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_5
+		FROM users u
+		LEFT JOIN scores s ON s.user_id = u.id AND s.deleted_at IS NULL
+		WHERE u.is_admin = 0 AND u.deleted_at IS NULL
+		GROUP BY u.id, u.employee_id, u.name, u.office
+		ORDER BY passed_count DESC, u.id ASC
+		LIMIT 20
+	`).Scan(&topUsers)
+
+	if topUsers == nil {
+		topUsers = []topRow{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"scores": topUsers})
 }
 
 // UpdateScore 手动设置单个用户某关卡通过状态（管理员）
