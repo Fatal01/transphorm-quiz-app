@@ -278,72 +278,54 @@ func GetScores(c *gin.Context) {
 
 // GetTopScores 获取按通关数量降序排列的前 20 名用户（专用于概览页排行榜）
 func GetTopScores(c *gin.Context) {
-	// 使用单条 SQL 完成聚合和排序，避免 N+1 查询
-	// 注意：MySQL 的 MAX(...) = 1 返回的是整数 0/1，不能直接映射到 Go bool，用 int 接收再手动转换
-	type rawRow struct {
-		ID          uint   `json:"id"`
-		EmployeeID  string `json:"employee_id"`
-		Name        string `json:"name"`
-		Office      string `json:"office"`
-		PassedCount int    `json:"passed_count"`
-		Quiz1       int    `json:"-"`
-		Quiz2       int    `json:"-"`
-		Quiz3       int    `json:"-"`
-		Quiz4       int    `json:"-"`
-		Quiz5       int    `json:"-"`
+	// 第一步：用 Raw SQL 查出按通关数降序排列的前 20 名用户 ID
+	// 注意：不在 Raw SQL 中直接 Scan bool 字段，避免 GORM 对 TINYINT(1) 的自动 bool 映射问题
+	type topUserID struct {
+		UserID      uint `gorm:"column:user_id"`
+		PassedCount int  `gorm:"column:passed_count"`
 	}
-	type topRow struct {
-		ID          uint   `json:"id"`
-		EmployeeID  string `json:"employee_id"`
-		Name        string `json:"name"`
-		Office      string `json:"office"`
-		PassedCount int    `json:"passed_count"`
-		Quiz1       bool   `json:"quiz_1"`
-		Quiz2       bool   `json:"quiz_2"`
-		Quiz3       bool   `json:"quiz_3"`
-		Quiz4       bool   `json:"quiz_4"`
-		Quiz5       bool   `json:"quiz_5"`
-	}
-
-	var rawRows []rawRow
+	var topIDs []topUserID
 	config.DB.Raw(`
 		SELECT
-			u.id,
-			u.employee_id,
-			u.name,
-			u.office,
-			COUNT(CASE WHEN s.score = 100 THEN 1 END) AS passed_count,
-			MAX(CASE WHEN s.quiz_index = 1 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_1,
-			MAX(CASE WHEN s.quiz_index = 2 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_2,
-			MAX(CASE WHEN s.quiz_index = 3 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_3,
-			MAX(CASE WHEN s.quiz_index = 4 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_4,
-			MAX(CASE WHEN s.quiz_index = 5 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_5
+			u.id AS user_id,
+			COUNT(CASE WHEN s.score = 100 THEN 1 END) AS passed_count
 		FROM users u
 		LEFT JOIN scores s ON s.user_id = u.id AND s.deleted_at IS NULL
 		WHERE u.is_admin = 0 AND u.deleted_at IS NULL
-		GROUP BY u.id, u.employee_id, u.name, u.office
+		GROUP BY u.id
 		ORDER BY passed_count DESC, u.id ASC
 		LIMIT 20
-	`).Scan(&rawRows)
+	`).Scan(&topIDs)
 
-	// 将整数 0/1 手动转换为 bool
-	topUsers := make([]topRow, 0, len(rawRows))
-	for _, r := range rawRows {
-		topUsers = append(topUsers, topRow{
-			ID:          r.ID,
-			EmployeeID:  r.EmployeeID,
-			Name:        r.Name,
-			Office:      r.Office,
-			PassedCount: r.PassedCount,
-			Quiz1:       r.Quiz1 == 1,
-			Quiz2:       r.Quiz2 == 1,
-			Quiz3:       r.Quiz3 == 1,
-			Quiz4:       r.Quiz4 == 1,
-			Quiz5:       r.Quiz5 == 1,
-		})
+	if len(topIDs) == 0 {
+		c.JSON(http.StatusOK, gin.H{"scores": []scoreRow{}})
+		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"scores": topUsers})
+	// 第二步：按排名顺序加载 User 模型（保持 Raw SQL 的排序）
+	orderedIDs := make([]uint, len(topIDs))
+	passedMap := map[uint]int{}
+	for i, t := range topIDs {
+		orderedIDs[i] = t.UserID
+		passedMap[t.UserID] = t.PassedCount
+	}
+
+	// 用 IN 查询加载用户，再按 orderedIDs 顺序重排
+	userMap := map[uint]models.User{}
+	var users []models.User
+	config.DB.Where("id IN ?", orderedIDs).Find(&users)
+	for _, u := range users {
+		userMap[u.ID] = u
+	}
+	orderedUsers := make([]models.User, 0, len(orderedIDs))
+	for _, id := range orderedIDs {
+		if u, ok := userMap[id]; ok {
+			orderedUsers = append(orderedUsers, u)
+		}
+	}
+
+	// 第三步：复用 buildScoreRows 构建响应（bool 映射完全正确）
+	c.JSON(http.StatusOK, gin.H{"scores": buildScoreRows(orderedUsers)})
 }
 
 // UpdateScore 手动设置单个用户某关卡通过状态（管理员）
