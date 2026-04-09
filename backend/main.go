@@ -72,11 +72,12 @@ func main() {
 		admin.Use(middleware.AdminRequired())
 		{
 			// 用户管理
-			admin.GET("/users", handlers.GetAllUsers)
-			admin.POST("/users/import", handlers.ImportUsers)
-			admin.DELETE("/users/:id", handlers.DeleteUser)
-			admin.PUT("/users/:id", handlers.UpdateUser)
-			admin.GET("/users/export", handlers.ExportUsers)
+				admin.GET("/users", handlers.GetAllUsers)
+				admin.POST("/users/import", handlers.ImportUsers)
+				admin.DELETE("/users/:id", handlers.DeleteUser)
+				admin.PUT("/users/:id", handlers.UpdateUser)
+				admin.GET("/users/export", handlers.ExportUsers)
+				admin.POST("/users/grant-initial-points", handlers.GrantInitialPoints) // 批量发放初始积分
 
 			// 分数/通过状态管理
 			admin.GET("/scores", handlers.GetScores)

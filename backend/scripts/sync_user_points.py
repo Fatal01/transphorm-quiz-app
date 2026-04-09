@@ -104,7 +104,8 @@ def sync_user_points(conn: pymysql.Connection) -> None:
       quiz_score      = SUM(points) WHERE type='quiz'     AND status='success'
       activity_points = SUM(points) WHERE type='activity' AND status='success'
       used_points     = SUM(points) WHERE type='redeem'   AND status='success'
-      points          = quiz_score + activity_points - used_points  (最小值为 0)
+      initial_points  = SUM(points) WHERE type='initial'  AND status='success'
+      points          = quiz_score + activity_points + initial_points - used_points  (最小值为 0)
     """
     log.info("=== 开始同步用户积分冗余字段 ===")
 
@@ -155,11 +156,19 @@ def sync_user_points(conn: pymysql.Connection) -> None:
             )
             used_points = cursor.fetchone()["total"]
 
-            available_points = quiz_score + activity_points - used_points
+            cursor.execute(
+                "SELECT COALESCE(SUM(points), 0) AS total "
+                "FROM redemptions "
+                "WHERE user_id = %s AND type = 'initial' AND status = 'success'",
+                (uid,)
+            )
+            initial_points = cursor.fetchone()["total"]
+
+            available_points = quiz_score + activity_points + initial_points - used_points
             if available_points < 0:
                 available_points = 0
 
-            # ── 检查是否需要修复 ──────────────────────────────────────────────
+            # ── 检查是否需要修复 ────────────────────────────────────
             needs_fix = (
                 user["quiz_score"]      != quiz_score      or
                 user["activity_points"] != activity_points or

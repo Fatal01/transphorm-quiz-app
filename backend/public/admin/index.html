@@ -117,6 +117,7 @@
     .badge-yellow { background: rgba(251,191,36,0.15); color: #fbbf24; }
     .badge-gray { background: rgba(100,116,139,0.2); color: #64748b; }
     .badge-orange { background: rgba(251,146,60,0.15); color: #fb923c; }
+    .badge-purple { background: rgba(167,139,250,0.15); color: #a78bfa; }
 
     /* 通过/未通过标记 */
     .pass-yes { color: #34d399; font-weight: 600; }
@@ -445,9 +446,12 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title">💰 用户积分明细</div>
-              <div class="search-bar">
-                <input class="search-input" id="pointsSearch" placeholder="搜索工号或姓名..." oninput="searchPoints()">
-                <button class="btn btn-secondary btn-sm" onclick="loadPoints(1)">搜索</button>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <div class="search-bar">
+                  <input class="search-input" id="pointsSearch" placeholder="搜索工号或姓名..." oninput="searchPoints()">
+                  <button class="btn btn-secondary btn-sm" onclick="loadPoints(1)">搜索</button>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openGrantInitialModal()">🎁 发放初始积分</button>
               </div>
             </div>
             <div class="table-wrap">
@@ -459,6 +463,7 @@
                     <th>办公地点</th>
                     <th>答题积分</th>
                     <th>活动积分</th>
+                    <th>初始积分</th>
                     <th>已消耗</th>
                     <th>可用积分</th>
                   </tr>
@@ -930,6 +935,7 @@
         tbody.innerHTML = users.map(u => {
           const quiz = u.quiz_score || 0;
           const activity = u.activity_points || 0;
+          const initial = u.initial_points || 0;
           const used = u.used_points || 0;
           const avail = u.points || 0;
           return `
@@ -939,6 +945,7 @@
               <td>${u.office || '-'}</td>
               <td><span class="badge badge-blue">${quiz}</span></td>
               <td><span class="badge badge-green">${activity}</span></td>
+              <td><span class="badge badge-purple">${initial}</span></td>
               <td><span class="badge badge-yellow">${used}</span></td>
               <td><strong style="color:#38bdf8">${avail}</strong></td>
             </tr>`;
@@ -952,6 +959,39 @@
     function searchPoints() {
       clearTimeout(pointsSearchTimer);
       pointsSearchTimer = setTimeout(() => loadPoints(1), 400);
+    }
+
+    // ===== 初始积分发放 =====
+    function openGrantInitialModal() {
+      const pts = prompt('请输入要发放的初始积分数量（正整数）：');
+      if (pts === null) return; // 用户点击取消
+      const points = parseInt(pts, 10);
+      if (isNaN(points) || points <= 0) {
+        showToast('请输入有效的正整数', 'error');
+        return;
+      }
+      if (!confirm(`确认要为所有未发放初始积分的用户发放 ${points} 分初始积分？（已有初始积分的用户不会重复发放）`)) return;
+      grantInitialPoints(points);
+    }
+
+    async function grantInitialPoints(points) {
+      try {
+        showToast('正在发放初始积分，请稍候...', 'info');
+        const res = await fetch(`${API_BASE}/admin/users/grant-initial-points`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ points })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.error || '发放失败', 'error');
+          return;
+        }
+        showToast(data.message || '发放完成', 'success');
+        loadPoints(1); // 刷新积分列表
+      } catch(e) {
+        showToast('网络错误，发放失败', 'error');
+      }
     }
 
     // ===== 兑换记录 =====
@@ -975,11 +1015,12 @@
             let typeLabel = '', typeBadge = '';
             if (r.type === 'activity') { typeLabel = '活动积分'; typeBadge = 'badge-green'; }
             else if (r.type === 'quiz') { typeLabel = '答题奖励'; typeBadge = 'badge-blue'; }
+            else if (r.type === 'initial') { typeLabel = '初始积分'; typeBadge = 'badge-purple'; }
             else { typeLabel = '商品兑换'; typeBadge = 'badge-yellow'; }
 
             let pointsText = '', pointsColor = '';
             if (r.status === 'refunded') { pointsText = '已退回'; pointsColor = '#fb923c'; }
-            else if (r.type === 'activity' || r.type === 'quiz') { pointsText = `+${r.points}`; pointsColor = '#34d399'; }
+            else if (r.type === 'activity' || r.type === 'quiz' || r.type === 'initial') { pointsText = `+${r.points}`; pointsColor = '#34d399'; }
             else if (r.status === 'success') { pointsText = `-${r.points}`; pointsColor = '#f87171'; }
             else { pointsText = `${r.points}`; pointsColor = '#64748b'; }
 

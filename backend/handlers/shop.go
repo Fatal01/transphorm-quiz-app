@@ -709,13 +709,20 @@ func SyncUserPointsTx(tx *gorm.DB, userID uint) error {
 		Where("user_id = ? AND type = 'redeem' AND status = 'success'", userID).
 		Scan(&usedSum)
 
-	// 4. 可用积分 = 答题 + 活动 - 已兑换
-	availablePoints := quizSum.Total + actSum.Total - usedSum.Total
+	// 4. 初始积分
+	var initSum struct{ Total int }
+	tx.Model(&models.Redemption{}).
+		Select("COALESCE(SUM(points),0) as total").
+		Where("user_id = ? AND type = 'initial' AND status = 'success'", userID).
+		Scan(&initSum)
+
+	// 5. 可用积分 = 答题 + 活动 + 初始 - 已兑换
+	availablePoints := quizSum.Total + actSum.Total + initSum.Total - usedSum.Total
 	if availablePoints < 0 {
 		availablePoints = 0
 	}
 
-	// 5. 一次性更新所有冗余字段，确保与 Redemption 表完全一致
+	// 6. 一次性更新所有冗余字段，确保与 Redemption 表完全一致
 	return tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"quiz_score":      quizSum.Total,
 		"activity_points": actSum.Total,
@@ -724,9 +731,9 @@ func SyncUserPointsTx(tx *gorm.DB, userID uint) error {
 	}).Error
 }
 
-// getUserPointsBreakdown 返回 (quiz积分, activity积分, 已兑换积分)。
+// getUserPointsBreakdown 返回 (quiz积分, activity积分, 已兑换积分, 初始积分)。
 // 所有积分均从 Redemption 表读取，与 SyncUserPointsTx 数据来源保持一致。
-func getUserPointsBreakdown(userID uint) (int, int, int) {
+func getUserPointsBreakdown(userID uint) (int, int, int, int) {
 	var quizSum struct{ Total int }
 	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
 		Where("user_id=? AND type='quiz' AND status='success'", userID).Scan(&quizSum)
@@ -739,7 +746,11 @@ func getUserPointsBreakdown(userID uint) (int, int, int) {
 	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
 		Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
 
-	return quizSum.Total, actSum.Total, usedSum.Total
+	var initSum struct{ Total int }
+	config.DB.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='initial' AND status='success'", userID).Scan(&initSum)
+
+	return quizSum.Total, actSum.Total, usedSum.Total, initSum.Total
 }
 
 // calcAvailablePointsTx 在事务内计算用户当前可用积分。
@@ -756,7 +767,11 @@ func calcAvailablePointsTx(tx *gorm.DB, userID uint) int {
 	tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
 		Where("user_id=? AND type='redeem' AND status='success'", userID).Scan(&usedSum)
 
-	available := quizPts + actSum.Total - usedSum.Total
+	var initSum struct{ Total int }
+	tx.Model(&models.Redemption{}).Select("COALESCE(SUM(points),0) as total").
+		Where("user_id=? AND type='initial' AND status='success'", userID).Scan(&initSum)
+
+	available := quizPts + actSum.Total + initSum.Total - usedSum.Total
 	if available < 0 {
 		available = 0
 	}
@@ -767,8 +782,8 @@ func calcAvailablePointsTx(tx *gorm.DB, userID uint) int {
 func GetUserPoints(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
-	quizScore, actPts, usedPts := getUserPointsBreakdown(userID)
-	available := quizScore + actPts - usedPts
+	quizScore, actPts, usedPts, initPts := getUserPointsBreakdown(userID)
+	available := quizScore + actPts + initPts - usedPts
 	if available < 0 {
 		available = 0
 	}
@@ -790,6 +805,7 @@ func GetUserPoints(c *gin.Context) {
 		"quiz_score":            quizScore,
 		"activity_points":       actPts,
 		"used_points":           usedPts,
+		"initial_points":        initPts,
 		"available_points":      available,
 		"passed_quizzes":        passedQuizzes,
 		"progress":              progress,
@@ -919,6 +935,81 @@ func GetStats(c *gin.Context) {
 		"total_redeem_pts":     totalRedeemPts.Total,
 		"office_counts":        officeCounts,
 		"activity_points_limit": limit,
+	})
+}
+
+// GrantInitialPoints 管理员为所有用户批量发放初始积分（幂等：已有初始积分的用户跳过）
+func GrantInitialPoints(c *gin.Context) {
+	var req struct {
+		Points int `json:"points" binding:"required,min=1"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误，points 必须为正整数"})
+		return
+	}
+
+	operatorID := c.GetUint("user_id")
+
+	// 获取所有非管理员用户
+	var users []models.User
+	if err := config.DB.Where("is_admin = ?", false).Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询用户失败"})
+		return
+	}
+
+	var grantedCount, skippedCount, errorCount int
+
+	for _, user := range users {
+		txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+			// 幂等检查：该用户是否已有初始积分记录
+			var existing int64
+			tx.Model(&models.Redemption{}).
+				Where("user_id = ? AND type = 'initial' AND status = 'success'", user.ID).
+				Count(&existing)
+			if existing > 0 {
+				// 已发放过，标记跳过（用 sentinel error 区分正常跳过）
+				return fmt.Errorf("skip")
+			}
+
+			// 写入初始积分流水记录
+			if err := tx.Create(&models.Redemption{
+				UserID:      user.ID,
+				EmployeeID:  user.EmployeeID,
+				UserName:    user.Name,
+				ProductID:   0,
+				ProductName: "初始积分",
+				Points:      req.Points,
+				Status:      "success",
+				Type:        "initial",
+				Remark:      fmt.Sprintf("管理员发放初始积分 %d 分", req.Points),
+				OperatorID:  operatorID,
+			}).Error; err != nil {
+				return fmt.Errorf("写入积分记录失败: %w", err)
+			}
+
+			// 同步 User 冗余字段
+			if err := SyncUserPointsTx(tx, user.ID); err != nil {
+				return fmt.Errorf("同步用户积分失败: %w", err)
+			}
+
+			return nil
+		})
+
+		if txErr == nil {
+			grantedCount++
+		} else if txErr.Error() == "skip" {
+			skippedCount++
+		} else {
+			errorCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       fmt.Sprintf("初始积分发放完成：成功 %d 人，跳过 %d 人，失败 %d 人", grantedCount, skippedCount, errorCount),
+		"granted_count": grantedCount,
+		"skipped_count": skippedCount,
+		"error_count":   errorCount,
+		"points":        req.Points,
 	})
 }
 

@@ -306,11 +306,11 @@ func ExportUsers(c *gin.Context) {
 	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	w := csv.NewWriter(c.Writer)
-	w.Write([]string{
-		"工号", "姓名", "办公地点",
-		"初创(1)", "挑战(2)", "突破(3)", "上升(4)", "转型(5)",
-		"答题积分", "活动积分", "已兑换", "可用积分",
-	})
+		w.Write([]string{
+			"工号", "姓名", "办公地点",
+			"初创(1)", "挑战(2)", "突破(3)", "上升(4)", "转型(5)",
+			"答题积分", "活动积分", "初始积分", "已兑换", "可用积分",
+		})
 
 	for _, u := range users {
 		// 各关卡通过状态：从 Score 表读取（展示用）
@@ -325,27 +325,28 @@ func ExportUsers(c *gin.Context) {
 			}
 		}
 
-		// 积分明细：全部从 Redemption 表读取，与后台管理页面和用户端接口数据来源一致
-		quizScore, actPts, usedPts := getUserPointsBreakdown(u.ID)
-		available := quizScore + actPts - usedPts
-		if available < 0 {
-			available = 0
-		}
+			// 积分明细：全部从 Redemption 表读取，与后台管理页面和用户端接口数据来源一致
+			quizScore, actPts, usedPts, initPts := getUserPointsBreakdown(u.ID)
+			available := quizScore + actPts + initPts - usedPts
+			if available < 0 {
+				available = 0
+			}
 
-		row := []string{
-			u.EmployeeID,
-			u.Name,
-			u.Office,
-			passMap[1],
-			passMap[2],
-			passMap[3],
-			passMap[4],
-			passMap[5],
-			strconv.Itoa(quizScore),
-			strconv.Itoa(actPts),
-			strconv.Itoa(usedPts),
-			strconv.Itoa(available),
-		}
+			row := []string{
+				u.EmployeeID,
+				u.Name,
+				u.Office,
+				passMap[1],
+				passMap[2],
+				passMap[3],
+				passMap[4],
+				passMap[5],
+				strconv.Itoa(quizScore),
+				strconv.Itoa(actPts),
+				strconv.Itoa(initPts),
+				strconv.Itoa(usedPts),
+				strconv.Itoa(available),
+			}
 		w.Write(row)
 	}
 	w.Flush()
