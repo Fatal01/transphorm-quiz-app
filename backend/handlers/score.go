@@ -257,12 +257,16 @@ func GetScores(c *gin.Context) {
 
 	var users []models.User
 	var total int64
-	query := config.DB.Model(&models.User{}).Where("is_admin = ?", false)
+
+	// 构建基础查询条件
+	baseQuery := config.DB.Model(&models.User{}).Where("is_admin = ?", false)
 	if search != "" {
-		query = query.Where("employee_id LIKE ? OR name LIKE ?", "%"+search+"%", "%"+search+"%")
+		baseQuery = baseQuery.Where("employee_id LIKE ? OR name LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
-	query.Count(&total)
-	query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&users)
+
+	// Count 和 Find 分开执行，避免 GORM 内部状态相互干扰
+	baseQuery.Count(&total)
+	baseQuery.Offset((page - 1) * pageSize).Limit(pageSize).Find(&users)
 
 	c.JSON(http.StatusOK, gin.H{
 		"scores":    buildScoreRows(users),
@@ -275,6 +279,19 @@ func GetScores(c *gin.Context) {
 // GetTopScores 获取按通关数量降序排列的前 20 名用户（专用于概览页排行榜）
 func GetTopScores(c *gin.Context) {
 	// 使用单条 SQL 完成聚合和排序，避免 N+1 查询
+	// 注意：MySQL 的 MAX(...) = 1 返回的是整数 0/1，不能直接映射到 Go bool，用 int 接收再手动转换
+	type rawRow struct {
+		ID          uint   `json:"id"`
+		EmployeeID  string `json:"employee_id"`
+		Name        string `json:"name"`
+		Office      string `json:"office"`
+		PassedCount int    `json:"passed_count"`
+		Quiz1       int    `json:"-"`
+		Quiz2       int    `json:"-"`
+		Quiz3       int    `json:"-"`
+		Quiz4       int    `json:"-"`
+		Quiz5       int    `json:"-"`
+	}
 	type topRow struct {
 		ID          uint   `json:"id"`
 		EmployeeID  string `json:"employee_id"`
@@ -288,7 +305,7 @@ func GetTopScores(c *gin.Context) {
 		Quiz5       bool   `json:"quiz_5"`
 	}
 
-	var topUsers []topRow
+	var rawRows []rawRow
 	config.DB.Raw(`
 		SELECT
 			u.id,
@@ -296,21 +313,34 @@ func GetTopScores(c *gin.Context) {
 			u.name,
 			u.office,
 			COUNT(CASE WHEN s.score = 100 THEN 1 END) AS passed_count,
-			MAX(CASE WHEN s.quiz_index = 1 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_1,
-			MAX(CASE WHEN s.quiz_index = 2 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_2,
-			MAX(CASE WHEN s.quiz_index = 3 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_3,
-			MAX(CASE WHEN s.quiz_index = 4 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_4,
-			MAX(CASE WHEN s.quiz_index = 5 AND s.score = 100 THEN 1 ELSE 0 END) = 1 AS quiz_5
+			MAX(CASE WHEN s.quiz_index = 1 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_1,
+			MAX(CASE WHEN s.quiz_index = 2 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_2,
+			MAX(CASE WHEN s.quiz_index = 3 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_3,
+			MAX(CASE WHEN s.quiz_index = 4 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_4,
+			MAX(CASE WHEN s.quiz_index = 5 AND s.score = 100 THEN 1 ELSE 0 END) AS quiz_5
 		FROM users u
 		LEFT JOIN scores s ON s.user_id = u.id AND s.deleted_at IS NULL
 		WHERE u.is_admin = 0 AND u.deleted_at IS NULL
 		GROUP BY u.id, u.employee_id, u.name, u.office
 		ORDER BY passed_count DESC, u.id ASC
 		LIMIT 20
-	`).Scan(&topUsers)
+	`).Scan(&rawRows)
 
-	if topUsers == nil {
-		topUsers = []topRow{}
+	// 将整数 0/1 手动转换为 bool
+	topUsers := make([]topRow, 0, len(rawRows))
+	for _, r := range rawRows {
+		topUsers = append(topUsers, topRow{
+			ID:          r.ID,
+			EmployeeID:  r.EmployeeID,
+			Name:        r.Name,
+			Office:      r.Office,
+			PassedCount: r.PassedCount,
+			Quiz1:       r.Quiz1 == 1,
+			Quiz2:       r.Quiz2 == 1,
+			Quiz3:       r.Quiz3 == 1,
+			Quiz4:       r.Quiz4 == 1,
+			Quiz5:       r.Quiz5 == 1,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"scores": topUsers})
