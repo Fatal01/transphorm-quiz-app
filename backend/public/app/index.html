@@ -400,6 +400,7 @@
     .record-status.refunded { background: rgba(249,115,22,0.15); color: #f97316; }
     .record-status.quiz { background: rgba(13,211,255,0.15); color: #0dd3ff; }
     .record-status.activity { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .record-status.initial { background: rgba(251,191,36,0.15); color: #fbbf24; }
     .empty-tip { text-align: center; color: rgba(255,255,255,0.3); padding: 40px 0; font-size: 14px; }
 
     /* 规则弹窗内容 */
@@ -526,6 +527,7 @@
       <div class="points-detail">
         答题积分: <span id="earnedPoints">0</span> &nbsp;|&nbsp;
         活动积分: <span id="activityPoints">0</span> &nbsp;|&nbsp;
+        初始积分: <span id="initialPoints">0</span> &nbsp;|&nbsp;
         已兑换: <span id="usedPoints">0</span>
       </div>
       <!-- 办公地点修改 -->
@@ -758,6 +760,7 @@
 
         const quizScore = data.quiz_score || 0;
         const activityPts = data.activity_points || 0;
+        const initialPts = data.initial_points || 0;
         const usedPts = data.used_points || 0;
         const available = data.available_points || 0;
         passedQuizzes = data.passed_quizzes || [];
@@ -766,6 +769,7 @@
         document.getElementById('availablePoints').textContent = available;
         document.getElementById('earnedPoints').textContent = quizScore;
         document.getElementById('activityPoints').textContent = activityPts;
+        document.getElementById('initialPoints').textContent = initialPts;
         document.getElementById('usedPoints').textContent = usedPts;
 
         // 进度条
@@ -1002,10 +1006,10 @@
           if (r.status === 'refunded') {
             pointsHtml = `<div class="record-points-neutral">已退回</div>`;
             statusHtml = `<div class="record-status refunded">已退回</div>`;
-          } else if (r.type === 'activity' || r.type === 'quiz') {
-            // 活动积分或答题奖励：显示 +积分
+          } else if (r.type === 'activity' || r.type === 'quiz' || r.type === 'initial') {
+            // 活动积分、答题奖励、初始积分：显示 +积分
             pointsHtml = `<div class="record-points-pos">+${r.points} 积分</div>`;
-            const typeLabel = r.type === 'quiz' ? '答题奖励' : '活动积分';
+            const typeLabel = r.type === 'quiz' ? '答题奖励' : r.type === 'initial' ? '初始积分' : '活动积分';
             statusHtml = `<div class="record-status ${r.type}">${typeLabel}</div>`;
           } else {
             // 商品兑换：显示 -积分
