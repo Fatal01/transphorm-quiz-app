@@ -11,6 +11,20 @@
       font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
       background: #0a0f1e; color: #fff;
     }
+    /* 鉴权前隐藏，防止普通用户看到页面内容闪烁 */
+    body.auth-pending { visibility: hidden; }
+
+    /* 非管理员提示遮罩 */
+    .no-access-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0a0f1e;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px;
+    }
+    .no-access-icon { font-size: 56px; }
+    .no-access-title { font-size: 18px; font-weight: 700; color: #fff; }
+    .no-access-sub { font-size: 14px; color: rgba(255,255,255,0.45); }
 
     /* ===== 顶部导航（单行，高度固定 52px）===== */
     .nav {
@@ -539,9 +553,33 @@
     const token = localStorage.getItem('quiz_token');
     const user = JSON.parse(localStorage.getItem('quiz_user') || '{}');
 
-    if (!token || !user.is_admin) {
-      window.location.href = '/app/login.html?redirect=' + encodeURIComponent('/shop/');
-    }
+    // 鉴权前先隐藏 body，防止页面内容闪烁
+    document.body.classList.add('auth-pending');
+
+    (function checkAuth() {
+      if (!token) {
+        // 未登录 → 跳转登录页
+        window.location.replace('/app/login.html?redirect=' + encodeURIComponent('/shop/'));
+        return;
+      }
+      if (!user.is_admin) {
+        // 已登录但非管理员 → 显示提示后跳转 /app/
+        document.body.classList.remove('auth-pending');
+        document.body.innerHTML = `
+          <div class="no-access-overlay">
+            <div class="no-access-icon">🚫</div>
+            <div class="no-access-title">非管理员无法访问</div>
+            <div class="no-access-sub">即将返回用户页面…</div>
+          </div>`;
+        setTimeout(function() {
+          window.location.replace('/app/');
+        }, 1500);
+        return;
+      }
+      // 管理员 → 正常显示
+      document.body.classList.remove('auth-pending');
+    })();
+
     document.getElementById('navUser').textContent = user.name || '';
 
     let selectedProductId = null;
