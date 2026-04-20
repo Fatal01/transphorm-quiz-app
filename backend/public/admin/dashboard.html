@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>活动数据大屏</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --card: #111827;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --accent2: #10b981;
+    --accent3: #f59e0b;
+    --accent4: #ef4444;
+    --accent5: #8b5cf6;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --glow: 0 0 20px rgba(59,130,246,0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── 顶部标题栏 ── */
+  .header {
+    background: linear-gradient(90deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #60a5fa, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+  }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .refresh-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .refresh-btn:hover { opacity: .8; }
+  .last-update { font-size: 12px; color: var(--muted); }
+  .back-btn {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color .2s, border-color .2s;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ── 主体布局 ── */
+  .main { padding: 24px 32px; }
+
+  /* ── KPI 卡片行 ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px;
+    text-align: center;
+    box-shadow: var(--glow);
+    transition: transform .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); }
+  .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .c-blue  { color: var(--accent); }
+  .c-green { color: var(--accent2); }
+  .c-amber { color: var(--accent3); }
+  .c-red   { color: var(--accent4); }
+  .c-purple{ color: var(--accent5); }
+
+  /* ── 今日实时横幅 ── */
+  .today-banner {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 100%);
+    border: 1px solid #2563eb55;
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .today-banner .today-title {
+    font-size: 13px;
+    color: #60a5fa;
+    font-weight: 600;
+    margin-right: 8px;
+    white-space: nowrap;
+  }
+  .today-item {
+    background: #0f172a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .today-item .t-label { font-size: 11px; color: var(--muted); }
+  .today-item .t-val   { font-size: 18px; font-weight: 700; margin-top: 2px; }
+
+  /* ── 图表网格 ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 1100px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--glow);
+  }
+  .chart-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .chart-card h3 .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap-tall { position: relative; height: 280px; }
+
+  /* ── 表格 ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #1a2535;
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1a2535; }
+  .rank { color: var(--muted); font-size: 12px; }
+  .rank-1 { color: #fbbf24; font-weight: 700; }
+  .rank-2 { color: #94a3b8; font-weight: 700; }
+  .rank-3 { color: #cd7c3c; font-weight: 700; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-activity { background: #064e3b; color: #34d399; }
+  .tag-redeem   { background: #1e1b4b; color: #818cf8; }
+  .tag-initial  { background: #1c1917; color: #d97706; }
+
+  /* ── 加载态 ── */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--muted);
+    font-size: 14px;
+    gap: 10px;
+  }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 类型汇总表 ── */
+  .type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .type-item {
+    background: #0f172a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .type-item .type-name { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .type-item .type-row  { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .type-item .type-row .label { color: var(--muted); }
+  .type-item .type-row .val   { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚡ 活动数据大屏</h1>
+  <div class="header-right">
+    <span class="last-update" id="lastUpdate">--</span>
+    <button class="refresh-btn" onclick="loadData()">刷新数据</button>
+    <a class="back-btn" href="/admin/">← 返回后台</a>
+  </div>
+</div>
+
+<div class="main" id="mainContent">
+  <div class="loading"><div class="spinner"></div>数据加载中...</div>
+</div>
+
+<script>
+const API = '/api/admin/dashboard';
+let charts = {};
+
+function getToken() {
+  return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+}
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+  charts = {};
+}
+
+function typeLabel(t) {
+  return { initial: '初始积分', activity: '线下活动', redeem: '商品兑换' }[t] || t;
+}
+
+function rankClass(i) {
+  if (i === 0) return 'rank-1';
+  if (i === 1) return 'rank-2';
+  if (i === 2) return 'rank-3';
+  return 'rank';
+}
+
+function fmt(n) {
+  if (n == null) return '0';
+  return Number(n).toLocaleString();
+}
+
+async function loadData() {
+  const token = getToken();
+  if (!token) { window.location.href = '/app/login.html?redirect=/admin/dashboard.html'; return; }
+
+  try {
+    const res = await fetch(API, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = '/app/login.html?redirect=/admin/dashboard.html';
+      return;
+    }
+    const d = await res.json();
+    document.getElementById('lastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString();
+    destroyCharts();
+    renderPage(d);
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML =
+      '<div class="loading" style="color:#ef4444">数据加载失败，请检查网络或重新登录</div>';
+  }
+}
+
+function renderPage(d) {
+  const el = document.getElementById('mainContent');
+  el.innerHTML = buildHTML(d);
+
+  // 积分分布饼图
+  if (d.points_dist && d.points_dist.length) {
+    const labels = d.points_dist.map(x => x.label);
+    const values = d.points_dist.map(x => x.count);
+    charts.pointsDist = new Chart(document.getElementById('chartPointsDist'), {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data: values,
+          backgroundColor: ['#475569','#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444'],
+          borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } } }
+      }
+    });
+  }
+
+  // 近7天趋势折线图
+  if (d.daily_trend && d.daily_trend.length) {
+    const labels = d.daily_trend.map(x => x.date);
+    charts.trend = new Chart(document.getElementById('chartTrend'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: '活动扫码', data: d.daily_trend.map(x => x.activity_ops),
+            borderColor: '#10b981', backgroundColor: '#10b98122', tension: .4, fill: true },
+          { label: '商品兑换', data: d.daily_trend.map(x => x.redeem_ops),
+            borderColor: '#8b5cf6', backgroundColor: '#8b5cf622', tension: .4, fill: true }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color: '#64748b' }, grid: { color: '#1e2d45' } },
+          y: { ticks: { color: '#64748b' }, grid: { color: '#1e2d45' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // 办公地点柱状图
+  if (d.office_stats && d.office_stats.length) {
+    const top = d.office_stats.slice(0, 10);
+    charts.office = new Chart(document.getElementById('chartOffice'), {
+      type: 'bar',
+      data: {
+        labels: top.map(x => x.office),
+        datasets: [{ label: '人数', data: top.map(x => x.count),
+          backgroundColor: '#3b82f6aa', borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#64748b' }, grid: { color: '#1e2d45' }, beginAtZero: true },
+          y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+function buildHTML(d) {
+  // ── 今日数据 ──
+  const todayMap = {};
+  (d.today_stats || []).forEach(t => { todayMap[t.type] = t; });
+  const todayActivity = todayMap['activity'] || {};
+  const todayRedeem   = todayMap['redeem']   || {};
+
+  // ── 类型汇总 ──
+  const typeMap = {};
+  (d.type_stats || []).forEach(t => { typeMap[t.type] = t; });
+  const ts = { initial: typeMap['initial']||{}, activity: typeMap['activity']||{}, redeem: typeMap['redeem']||{} };
+
+  // ── 活动排行表 ──
+  const actRows = (d.activity_stats || []).map((a, i) => `
+    <tr>
+      <td class="${rankClass(i)}">${i+1}</td>
+      <td>${a.name}</td>
+      <td class="c-green">${fmt(a.participants)}</td>
+      <td>${fmt(a.scan_count)}</td>
+      <td class="c-amber">${fmt(a.total_points)}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="color:#64748b;text-align:center;padding:20px">暂无数据</td></tr>';
+
+  // ── 商品排行表 ──
+  const prodRows = (d.product_stats || []).map((p, i) => `
+    <tr>
+      <td class="${rankClass(i)}">${i+1}</td>
+      <td>${p.name}</td>
+      <td class="c-purple">${fmt(p.redeem_count)}</td>
+      <td>${fmt(p.participants)}</td>
+      <td class="c-red">${fmt(p.total_points)}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="color:#64748b;text-align:center;padding:20px">暂无数据</td></tr>';
+
+  return `
+  <!-- KPI 卡片 -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">总员工数</div>
+      <div class="kpi-value c-blue">${fmt(d.total_users)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">参与闯关</div>
+      <div class="kpi-value c-green">${fmt(d.participated_users)}</div>
+      <div class="kpi-sub">${d.total_users ? Math.round(d.participated_users/d.total_users*100) : 0}% 参与率</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">全通关人数</div>
+      <div class="kpi-value c-amber">${fmt(d.all_passed_users)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">平均通关数</div>
+      <div class="kpi-value c-purple">${(d.avg_passed_quizzes||0).toFixed(1)}</div>
+      <div class="kpi-sub">满分 5 关</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">沉默用户</div>
+      <div class="kpi-value" style="color:#64748b">${fmt(d.silent_users)}</div>
+      <div class="kpi-sub">未参与任何活动</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">积分清零</div>
+      <div class="kpi-value c-red">${fmt(d.zero_points_users)}</div>
+      <div class="kpi-sub">高活跃用户</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">活动积分发放</div>
+      <div class="kpi-value c-green">${fmt(d.total_activity_pts)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">答题积分发放</div>
+      <div class="kpi-value c-blue">${fmt(d.total_quiz_pts)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">初始积分发放</div>
+      <div class="kpi-value c-amber">${fmt(d.total_initial_pts)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">商品兑换消耗</div>
+      <div class="kpi-value c-red">${fmt(d.total_redeem_pts)}</div>
+      <div class="kpi-sub">共 ${fmt(d.total_redeem_count)} 次</div>
+    </div>
+  </div>
+
+  <!-- 今日实时 -->
+  <div class="today-banner">
+    <span class="today-title">📅 今日实时</span>
+    <div class="today-item">
+      <div class="t-label">活动扫码人数</div>
+      <div class="t-val c-green">${fmt(todayActivity.participants)}</div>
+    </div>
+    <div class="today-item">
+      <div class="t-label">活动扫码次数</div>
+      <div class="t-val c-green">${fmt(todayActivity.op_count)}</div>
+    </div>
+    <div class="today-item">
+      <div class="t-label">今日活动积分</div>
+      <div class="t-val c-amber">${fmt(todayActivity.total_points)}</div>
+    </div>
+    <div class="today-item">
+      <div class="t-label">兑换人数</div>
+      <div class="t-val c-purple">${fmt(todayRedeem.participants)}</div>
+    </div>
+    <div class="today-item">
+      <div class="t-label">兑换次数</div>
+      <div class="t-val c-purple">${fmt(todayRedeem.op_count)}</div>
+    </div>
+    <div class="today-item">
+      <div class="t-label">今日消耗积分</div>
+      <div class="t-val c-red">${fmt(todayRedeem.total_points)}</div>
+    </div>
+  </div>
+
+  <!-- 类型汇总 + 趋势 -->
+  <div class="grid-2">
+    <div class="chart-card">
+      <h3>各类型操作汇总 <span class="badge">排除答题</span></h3>
+      <div class="type-grid">
+        ${['initial','activity','redeem'].map(type => {
+          const t = ts[type];
+          return `<div class="type-item">
+            <div class="type-name"><span class="tag tag-${type}">${typeLabel(type)}</span></div>
+            <div class="type-row"><span class="label">参与人数</span><span class="val">${fmt(t.participants)}</span></div>
+            <div class="type-row"><span class="label">操作次数</span><span class="val">${fmt(t.op_count)}</span></div>
+            <div class="type-row"><span class="label">积分总量</span><span class="val">${fmt(t.total_points)}</span></div>
+            <div class="type-row"><span class="label">退回次数</span><span class="val" style="color:#ef4444">${fmt(t.refund_count)}</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>近 7 天操作趋势</h3>
+      <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 活动排行 + 商品排行 -->
+  <div class="grid-2">
+    <div class="chart-card">
+      <h3>线下活动参与排行</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>活动名称</th><th>参与人数</th><th>扫码次数</th><th>发放积分</th></tr></thead>
+          <tbody>${actRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>商品兑换排行</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>商品名称</th><th>兑换次数</th><th>兑换人数</th><th>消耗积分</th></tr></thead>
+          <tbody>${prodRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 积分分布 + 办公地点 -->
+  <div class="grid-2">
+    <div class="chart-card">
+      <h3>员工积分分布</h3>
+      <div class="chart-wrap"><canvas id="chartPointsDist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>各办公地点人数（Top 10）</h3>
+      <div class="chart-wrap-tall"><canvas id="chartOffice"></canvas></div>
+    </div>
+  </div>
+  `;
+}
+
+// 鉴权检查
+(function() {
+  const token = getToken();
+  if (!token) { window.location.href = '/app/login.html?redirect=/admin/dashboard.html'; return; }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (!payload.is_admin) {
+      document.body.style.visibility = 'visible';
+      document.getElementById('mainContent').innerHTML =
+        '<div class="loading" style="color:#ef4444">🚫 非管理员无法访问此页面</div>';
+      setTimeout(() => window.location.href = '/app/', 2000);
+      return;
+    }
+  } catch(e) {
+    window.location.href = '/app/login.html';
+    return;
+  }
+  loadData();
+  // 每 60 秒自动刷新
+  setInterval(loadData, 60000);
+})();
+</script>
+</body>
+</html>

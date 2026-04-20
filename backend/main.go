@@ -112,6 +112,7 @@ func main() {
 
 				// 统计聚合 API（替代前端大分页请求）
 				admin.GET("/stats", handlers.GetStats)
+				admin.GET("/dashboard", handlers.GetDashboard) // 数据大屏
 		}
 	}
 
