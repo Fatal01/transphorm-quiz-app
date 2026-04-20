@@ -264,7 +264,7 @@ const API = '/api/admin/dashboard';
 let charts = {};
 
 function getToken() {
-  return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+  return localStorage.getItem('quiz_token') || sessionStorage.getItem('quiz_token') || '';
 }
 
 function destroyCharts() {
