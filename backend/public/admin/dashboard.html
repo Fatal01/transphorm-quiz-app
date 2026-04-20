@@ -552,17 +552,12 @@ function buildHTML(d) {
 (function() {
   const token = getToken();
   if (!token) { window.location.href = '/app/login.html?redirect=/admin/dashboard.html'; return; }
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (!payload.is_admin) {
-      document.body.style.visibility = 'visible';
-      document.getElementById('mainContent').innerHTML =
-        '<div class="loading" style="color:#ef4444">🚫 非管理员无法访问此页面</div>';
-      setTimeout(() => window.location.href = '/app/', 2000);
-      return;
-    }
-  } catch(e) {
-    window.location.href = '/app/login.html';
+  const user = JSON.parse(localStorage.getItem('quiz_user') || '{}');
+  if (!user.is_admin) {
+    document.body.style.visibility = 'visible';
+    document.getElementById('mainContent').innerHTML =
+      '<div class="loading" style="color:#ef4444">🚫 非管理员无法访问此页面</div>';
+    setTimeout(() => window.location.href = '/app/', 2000);
     return;
   }
   loadData();
